@@ -12,10 +12,11 @@
     "node": ">=20"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.468.0",
-    "qrcode": "^1.5.4"
+    "three": "0.184.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",
