@@ -1,0 +1,16 @@
+digraph NOSQL {
+ graph [bgcolor="#ffffff",rankdir=LR,nodesep="0.6",ranksep="0.75",pad="0.3",label="NEXSTAGE  ·  MONGODB DOCUMENTS & BOOKING SYNC",labelloc=t,fontname="Arial",fontsize=18,fontcolor="#4e3283"];
+ node [shape=box,style="rounded,filled",fillcolor="#f9f3ff",color="#cdb3ec",penwidth=1.5,fontname="Arial",fontsize=11,fontcolor="#4b3272",margin=".20,.15"];
+ edge [color="#995fd8",penwidth=1.5,fontsize=9,fontname="Arial",arrowsize=.65];
+ cart[label="CARTS\n{userId, items: [{ticketTypeId,quantity}]}" ];
+ review[label="REVIEWS\n{userId, eventId, rating, text}" ];
+ wishlist[label="WISHLISTS\n{userId, eventIds: [id]}" ];
+ notification[label="NOTIFICATIONS\n{userId, title, message, type, isRead, dedupeKey}" ];
+ sql[label="MYSQL BOOKING\nACID Transaction\nstatus + sync_status",fillcolor="#e8d8fa"];
+ worker[label="IN-PROCESS RETRY WORKER\nIdempotent reconciliation",fillcolor="#ffeff8"];
+ cart->sql[label=" checkout items "];
+ sql->worker[label=" committed booking "];
+ worker->cart [label=" clear purchased items "];
+ worker->notification [label=" upsert notice "];
+ wishlist->review [style=dashed,color="#c9b8e0",label=" independent UI CRUD "];
+}

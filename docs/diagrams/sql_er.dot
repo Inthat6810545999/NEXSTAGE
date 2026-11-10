@@ -1,0 +1,15 @@
+digraph SQL_ER {
+ graph [rankdir=LR, bgcolor="#ffffff", nodesep="0.65",ranksep=".75",splines=polyline,pad="0.3",label="NEXSTAGE  ·  MYSQL RELATIONAL SCHEMA (5 TABLES)",labelloc=t,fontname="Arial",fontsize=18,fontcolor="#4e3283"];
+ node [shape=record,fontname="Arial",style="filled",fillcolor="#f7f1ff",color="#bca0e0",penwidth=1.6,fontcolor="#493163",fontsize=11,margin="0.14,0.10"];
+ edge [color="#8c59cf",penwidth=1.5,arrowsize=.7,fontname="Arial",fontsize=9];
+ users[label="{USERS|PK id (INT)\ldisplay_name\lemail (UNIQUE)\lpassword_hash\lrole\lcreated_at\l}"];
+ events[label="{EVENTS|PK id\lFK organizer_id\ltitle / category / venue\laudience_groups (JSON)\lbenefits (JSON)\lcity / description\lstart_at / end_at\lposter_path / status\l}"];
+ ticket_types[label="{TICKET_TYPES|PK id\lFK event_id\llabel / price\lcapacity / available\l}"];
+ bookings[label="{BOOKINGS|PK id\lFK user_id\lbooking_code (UNIQUE)\ltotal_amount / status\lsync_status / created_at\l}"];
+ booking_items[label="{BOOKING_ITEMS|PK id\lFK booking_id\lFK ticket_type_id\lquantity / unit_price\l}"];
+ users->events [label="1:N organizer"];
+ users->bookings [label="1:N user"];
+ events->ticket_types [label="1:N"];
+ bookings->booking_items [label="1:N"];
+ ticket_types->booking_items [label="1:N"];
+}

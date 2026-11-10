@@ -1,0 +1,15 @@
+digraph NEXSTAGE {
+  graph [rankdir=TB, bgcolor="#ffffff", pad="0.24", nodesep="0.55", ranksep="0.55", splines=ortho, fontname="Arial", label="NEXSTAGE  ·  LOCAL HYBRID DATABASE ARCHITECTURE", labelloc=t, fontsize=17, fontcolor="#4e3283"];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=12, color="#d7c4f0", fontcolor="#462e67", fillcolor="#f8f4ff", margin="0.25,0.16", penwidth=1.5];
+  edge [color="#9762dc",penwidth=1.7,arrowsize=.75];
+  client [label="REACT FRONTEND\nlocalhost:5173\nPurple & White UI"];
+  api [label="NODE.JS / EXPRESS MONOLITH\nlocalhost:4000\nAuth · CRUD · Booking Transactions · Retry Worker",fillcolor="#ece0fc"];
+  mysql [label="MYSQL 8.4 (LOCAL)\nUsers · Events · Ticket Types\nBookings · Booking Items"];
+  mongo [label="MONGODB 7 (LOCAL)\nCarts · Reviews\nWishlists · Notifications"];
+  media [label="LOCAL MEDIA\nSVG Poster Files\nclient/public/posters",fillcolor="#fff6fd"];
+  client->api [label=" /api ", fontname="Arial", fontsize=10];
+  api->mysql [label="SQL ACID",fontname="Arial",fontsize=10];
+  api->mongo [label="Document CRUD",fontname="Arial",fontsize=10];
+  client->media [label="Local static files",fontname="Arial",fontsize=10];
+  {rank=same; mysql; mongo; media;}
+}

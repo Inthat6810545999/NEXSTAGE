@@ -1,0 +1,26 @@
+{
+  "name": "nexstage-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "seed": "node src/seed.js",
+    "test": "node --test",
+    "migrate:v2": "node src/migrate-v2.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.15.1",
+    "mysql2": "^3.14.0",
+    "multer": "^1.4.5-lts.1"
+  }
+}
