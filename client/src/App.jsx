@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, CreditCard, Database, Heart, MapPin, Menu, Minus, Plus, Search, ShieldCheck, ShoppingBag, Sparkles, Ticket, Trash2, UserCircle, Users, X, Bell, LogOut, LayoutDashboard, Zap, SlidersHorizontal, Send, Pencil, AlertCircle, LoaderCircle, RotateCcw, Star, PartyPopper, GraduationCap, BriefcaseBusiness, Flower2, HandHeart, Award, UploadCloud, TrendingUp } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, CreditCard, Database, Heart, MapPin, Menu, Minus, Plus, Search, ShieldCheck, ShoppingBag, Sparkles, Ticket, Trash2, UserCircle, Users, X, Bell, LogOut, LayoutDashboard, Zap, SlidersHorizontal, Send, Pencil, AlertCircle, LoaderCircle, RotateCcw, Star, PartyPopper, GraduationCap, BriefcaseBusiness, Flower2, HandHeart, Award, UploadCloud, TrendingUp, Box, Map as MapIcon } from 'lucide-react';
 import QRCode from 'qrcode';
 import { demoEvents } from './demo';
+import VenuePreview from './VenuePreview';
 
 async function api(path,options={}) {
   const res=await fetch(`/api${path}`,{
@@ -54,9 +55,9 @@ const editableJson=(name,row)=>{
   return JSON.stringify(copy,null,2);
 };
 function Button({children,variant='primary',className='',...props}){return <button className={classes('btn',`btn-${variant}`,className)} {...props}>{children}</button>;}
-function Modal({onClose,children,wide=false}) {
+function Modal({onClose,children,wide=false,label}) {
   useEffect(()=>{ const f=e=>e.key==='Escape'&&onClose(); document.addEventListener('keydown',f); return ()=>document.removeEventListener('keydown',f); },[onClose]);
-  return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section role="dialog" aria-modal="true" className={classes('modal',wide&&'wide')}><button className="icon-btn close-modal" aria-label="Close" onClick={onClose}><X size={21}/></button>{children}</section></div>;
+  return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section role="dialog" aria-modal="true" aria-label={label} className={classes('modal',wide&&'wide')}><button className="icon-btn close-modal" aria-label="Close" onClick={onClose}><X size={21}/></button>{children}</section></div>;
 }
 function Pill({children,kind='light'}){return <span className={classes('pill',`pill-${kind}`)}>{children}</span>;}
 function EventCard({event,onOpen,favorite,onToggleFavorite,rank}) {
@@ -101,13 +102,31 @@ function AuthModal({onClose,onSuccess,notify}){
 function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed}) {
   const [choice,setChoice]=useState(event.tickets?.[0]?.id);const [qty,setQty]=useState(1);
   const [rating,setRating]=useState(5);const [review,setReview]=useState('');const [reviews,setReviews]=useState([]);const [busy,setBusy]=useState(false);
+  const [venueMode, setVenueMode] = useState(null);
+  const venueButtons = useRef({});
+  const returnFocus = useRef(null);
+  const hasVenuePreview = event.venue?.trim().toLowerCase() === 'impact arena';
+  useEffect(() => {
+    if (!venueMode && returnFocus.current) venueButtons.current[returnFocus.current]?.focus();
+  }, [venueMode]);
+  function openVenue(mode) {
+    returnFocus.current = mode;
+    setVenueMode(mode);
+  }
   useEffect(()=>{api(`/reviews?eventId=${event.id}`).then(r=>setReviews(r.reviews)).catch(()=>{});},[event.id]);
   const ticket=event.tickets.find(t=>t.id===Number(choice))||event.tickets[0];
   async function submitReview(e){e.preventDefault();if(!user)return onLogin();setBusy(true);try{await api('/reviews',{method:'POST',body:{eventId:event.id,rating,text:review}});setReview('');onReviewed?.();const r=await api(`/reviews?eventId=${event.id}`);setReviews(r.reviews);notify('Review published');}catch(err){notify(err.message,'error');}finally{setBusy(false);}}
-  return <Modal wide onClose={onClose}><div className="detail-layout"><div className="detail-left"><img className="detail-poster" src={event.poster_path} alt={`${event.title} poster`}/><div className="detail-reviews"><div className="section-row"><h3>Community reviews</h3><Pill>{reviews.length} reviews</Pill></div>{reviews.length?reviews.slice(0,3).map(r=><div className="review-item" key={r._id}><span className="review-stars">{'★'.repeat(r.rating)}</span><p>{r.text}</p></div>):<p className="muted">Be the first to review this event.</p>}
+  if (venueMode) return <Modal wide onClose={onClose} label={event.title + ' venue preview'}>
+    <VenuePreview event={event} mode={venueMode} onMode={setVenueMode} onBack={()=>setVenueMode(null)} />
+  </Modal>;
+  return <Modal wide onClose={onClose} label={event.title}><div className="detail-layout"><div className="detail-left"><img className="detail-poster" src={event.poster_path} alt={`${event.title} poster`}/><div className="detail-reviews"><div className="section-row"><h3>Community reviews</h3><Pill>{reviews.length} reviews</Pill></div>{reviews.length?reviews.slice(0,3).map(r=><div className="review-item" key={r._id}><span className="review-stars">{'★'.repeat(r.rating)}</span><p>{r.text}</p></div>):<p className="muted">Be the first to review this event.</p>}
     <form onSubmit={submitReview} className="review-form"><div className="rating-select">{[1,2,3,4,5].map(i=><button type="button" key={i} className={i<=rating?'star-on':'star-off'} onClick={()=>setRating(i)}>★</button>)}</div><input required maxLength={1500} placeholder="Share your thoughts…" value={review} onChange={e=>setReview(e.target.value)}/><button className="mini-submit" disabled={busy} aria-label="Post review"><Send size={17}/></button></form></div></div>
     <div className="detail-right"><Pill kind="purple">{event.category}</Pill><h2>{event.title}</h2>
       <div className="event-detail-tags">{audienceTags(event).map(g=><span key={g}><Users size={12}/>{audienceName(g)}</span>)}{benefitTags(event).map(k=><span key={k}><Award size={12}/>{benefitOptions.find(b=>b.id===k)?.name||k}</span>)}</div><p className="detail-description">{event.description}</p><div className="detail-info"><div><CalendarDays size={18}/><span><b>{readableDate(event.start_at)}</b><small>{new Date(event.start_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</small></span></div><div><MapPin size={18}/><span><b>{event.venue}</b><small>{event.city}, Thailand</small></span></div></div>
+      {hasVenuePreview && <div className="venue-entry" aria-label="Explore seating">
+        <button type="button" ref={element=>{venueButtons.current['3d']=element;}} onClick={()=>openVenue('3d')}><Box size={16}/> 3D Preview</button>
+        <button type="button" ref={element=>{venueButtons.current['2d']=element;}} onClick={()=>openVenue('2d')}><MapIcon size={16}/> 2D Map</button>
+      </div>}
       <div className="ticket-picker"><div className="ticket-picker-top"><strong>Choose your ticket</strong><span>Prices in THB</span></div>{event.tickets.map(t=><button key={t.id} onClick={()=>{setChoice(t.id);setQty(1);}} className={classes('ticket-choice',choice===t.id&&'selected')}><span className="radio-dot"/><span className="ticket-choice-title"><strong>{t.label}</strong><small>{t.available} seats left</small></span><b>{money(t.price)}</b></button>)}</div>
       <div className="qty-and-total"><div className="qty-toggle"><button onClick={()=>setQty(Math.max(1,qty-1))} aria-label="Decrease"><Minus size={16}/></button><strong>{qty}</strong><button onClick={()=>setQty(Math.min(20,qty+1))} aria-label="Increase"><Plus size={16}/></button></div><div className="total"><span>Total</span><strong>{money((ticket?.price||0)*qty)}</strong></div></div>
       <Button className="full" disabled={!ticket} onClick={()=>onAdd(ticket,qty)}><ShoppingBag size={18}/> Add to cart <ArrowRight size={17}/></Button><p className="secure-note"><ShieldCheck size={15}/> Secure local demo booking · No real payments</p>
