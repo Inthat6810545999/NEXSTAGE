@@ -18,7 +18,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-.venue-entry button:first-child, .venue-modes button[aria-pressed="true"] {
+.venue-modes button[aria-pressed="true"] {
   background: #f1e6fb;
   border-color: #dcc6f1;
   color: #632bb0;
