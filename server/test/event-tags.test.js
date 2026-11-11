@@ -16,12 +16,13 @@ test('invalid audience / benefit identifiers are rejected', () => {
 test('multiple benefit tags can be stored as a JSON list', () => {
   assert.deepEqual(normalizeEventTags('benefits',['portfolio','volunteer','portfolio']),['portfolio','volunteer']);
 });
-test('legacy events without audience tags remain visible to everyone', () => {
-  assert.equal(matchesAudience({audience_groups:null},'senior'),true);
+test('legacy events without audience tags are listed under All audiences', () => {
+  assert.equal(matchesAudience({audience_groups:null},'all'),true);
+  assert.equal(matchesAudience({audience_groups:null},'senior'),false);
   assert.deepEqual(parseEventTags(null,['everyone']),['everyone']);
 });
-test('audience filters include relevant and open-to-all activities', () => {
+test('specific audience filters match only explicitly tagged events', () => {
   assert.equal(matchesAudience({audience_groups:['student','university']},'student'),true);
   assert.equal(matchesAudience({audience_groups:['student','university']},'senior'),false);
-  assert.equal(matchesAudience({audience_groups:'["everyone"]'},'senior'),true);
+  assert.equal(matchesAudience({audience_groups:'["everyone"]'},'senior'),false);
 });

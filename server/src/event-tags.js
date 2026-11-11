@@ -36,5 +36,5 @@ export function parseEventTags(value, fallback = []) {
 export function matchesAudience(event, audience) {
   if (!audience || audience === 'all') return true;
   const groups = parseEventTags(event.audience_groups, ['everyone']);
-  return groups.includes('everyone') || groups.includes(audience);
+  return groups.includes(audience);
 }
