@@ -13,6 +13,7 @@ import { parseEventTags, matchesAudience } from './event-tags.js';
 import { requireAuth, requireAdmin, writeSession, clearSession } from './auth.js';
 import { createBooking, cancelBooking, syncBooking, retryPending, demonstrateRollback } from './booking.js';
 import { listAdmin, createAdmin, updateAdmin, deleteAdmin } from './admin.js';
+import { answerEventQuestion } from './assistant.js';
 
 const app=express();
 const uploadDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public/uploads');
@@ -79,17 +80,38 @@ app.post('/api/auth/login',handler(async(req,res)=>{
 }));
 app.post('/api/auth/logout',(_req,res)=>{ clearSession(res); res.json({ok:true}); });
 
-app.get('/api/events',handler(async(req,res)=>{
+async function publishedEvents() {
   const [events]=await pool.query(`SELECT e.*, u.display_name AS organizer_name FROM events e JOIN users u ON u.id=e.organizer_id
     WHERE e.status='published' ORDER BY e.start_at,id LIMIT 80`);
   const [types]=await pool.query('SELECT * FROM ticket_types ORDER BY price,id');
   const tickets=new Map();
   for(const t of types) tickets.set(t.event_id,[...(tickets.get(t.event_id)||[]),t]);
-  let arr=events.map(e=>({...e,audience_groups:parseEventTags(e.audience_groups,['everyone']),benefits:parseEventTags(e.benefits,[]),tickets:tickets.get(e.id)||[]}));
+  return events.map(e=>({...e,audience_groups:parseEventTags(e.audience_groups,['everyone']),benefits:parseEventTags(e.benefits,[]),tickets:tickets.get(e.id)||[]}));
+}
+
+app.get('/api/events',handler(async(req,res)=>{
+  let arr=await publishedEvents();
   if(req.query.audience && req.query.audience!=='all') arr=arr.filter(e=>matchesAudience(e, req.query.audience));
   if(req.query.category && req.query.category!=='All') arr=arr.filter(e=>e.category===req.query.category);
   if(req.query.search) { const q=String(req.query.search).toLowerCase(); arr=arr.filter(e=>`${e.title} ${e.venue} ${e.category}`.toLowerCase().includes(q)); }
   res.json({events:arr});
+}));
+let assistantWindowStart = 0;
+let assistantRequests = 0;
+app.post('/api/assistant',handler(async(req,res)=>{
+  const question = mustText(req.body?.question, 'question', 600);
+  const key = process.env.GEMINI_API_KEY?.trim();
+  if (!key) throw new HttpError(503, 'NexAI is not configured yet. Ask the site owner to connect Gemini.');
+
+  const now = Date.now();
+  if (now - assistantWindowStart >= 60_000) {
+    assistantWindowStart = now;
+    assistantRequests = 0;
+  }
+  if (assistantRequests >= 12) throw new HttpError(429, 'NexAI is busy. Please try again in a minute.');
+  assistantRequests++;
+  const events = await publishedEvents();
+  res.json(await answerEventQuestion(question, events, key));
 }));
 app.get('/api/events/:id',handler(async(req,res)=>{
   const [[e]]=await pool.query('SELECT * FROM events WHERE id=?',[mustInt(req.params.id)]);
