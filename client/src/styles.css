@@ -70,4 +70,19 @@
 @media(max-width:1000px){.audience-grid,.choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.audience-feature{padding:19px 15px}.audience-feature-head h3{font-size:21px}.audience-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.audience-card{min-height:130px}.choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid,.insight-panel{grid-template-columns:1fr}.form-grid{gap:12px}.insight-panel{gap:13px;padding:17px}.insight-item{grid-template-columns:90px 1fr 18px}}
 @media(prefers-reduced-motion:reduce){.audience-card,.event-card,.event-cover img{transition:none!important}.audience-card:hover,.event-card:hover,.event-card:hover .event-cover img{transform:none!important}}
+
+/* Keep the hero artwork gently in motion without shifting its layout. */
+.hero-circle-one{animation:hero-orbit 12s ease-in-out infinite alternate}
+.hero-circle-two{animation:hero-orbit 15s ease-in-out infinite alternate-reverse}
+.poster-front{animation:hero-float 5.5s ease-in-out infinite}
+.poster-back{animation:hero-float 6.5s ease-in-out -2s infinite}
+.hero-float-top{animation:hero-float 5s ease-in-out -1s infinite}
+.hero-float-bottom{animation:hero-float 5.8s ease-in-out -2.5s infinite}
+.hero-spark-a{animation:hero-twinkle 3.2s ease-in-out infinite}
+.hero-spark-b{animation:hero-twinkle 3.8s ease-in-out -1.4s infinite}
+.hero-pill svg{animation:hero-twinkle 3.4s ease-in-out infinite}
+@keyframes hero-float{0%,100%{translate:0 0}50%{translate:0 -9px}}
+@keyframes hero-orbit{from{translate:0 0}to{translate:10px -12px}}
+@keyframes hero-twinkle{0%,100%{opacity:.65;scale:.92}50%{opacity:1;scale:1.08}}
+@media(prefers-reduced-motion:reduce){.hero-circle-one,.hero-circle-two,.poster-front,.poster-back,.hero-float-top,.hero-float-bottom,.hero-spark-a,.hero-spark-b,.hero-pill svg{animation:none}}
 .tiny-help{font-size:10px;color:#9e8bb3;line-height:1.6;margin:0}
