@@ -55,4 +55,4 @@ export const UserActivityLog = mongoose.model(
   'user_activity_logs'
 );
 
-export const collections = { carts: Cart, reviews: Review, wishlists: Wishlist, notifications: Notification };
+export const collections = { carts: Cart, reviews: Review, wishlists: Wishlist, notifications: Notification, user_activity_logs: UserActivityLog };
