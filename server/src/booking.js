@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { pool } from './config.js';
 import { Cart, Notification } from './models.js';
 import { HttpError, mustInt, normalizeItems } from './util.js';
+import { recordBookingActivity } from './activity-log.js';
 
 export async function createBooking(userId, rawItems) {
   const items = normalizeItems(rawItems);
@@ -57,7 +58,10 @@ export async function cancelBooking(bookingId, userId=null) {
 // Durable retry source lives in SQL bookings.sync_status. Cross-DB writes are
 // idempotent and eventually consistent, not a distributed ACID transaction.
 export async function syncBooking(bookingId) {
-  const [[b]] = await pool.query('SELECT * FROM bookings WHERE id=?',[mustInt(bookingId)]);
+  const [[b]] = await pool.query(
+    'SELECT *, UNIX_TIMESTAMP(created_at) AS created_at_unix FROM bookings WHERE id=?',
+    [mustInt(bookingId)]
+  );
   if (!b) return;
   try {
     const [items] = await pool.query('SELECT ticket_type_id FROM booking_items WHERE booking_id=?',[b.id]);
@@ -66,6 +70,13 @@ export async function syncBooking(bookingId) {
       await Cart.updateOne({userId:b.user_id}, {$pull:{items:{ticketTypeId:{$in:ids}}}});
     }
     const cancelled = b.status === 'cancelled';
+    await recordBookingActivity(b, 'booking_confirmed', {
+      timestamp: new Date(Number(b.created_at_unix) * 1000)
+    });
+
+    if (cancelled) {
+      await recordBookingActivity(b, 'booking_cancelled');
+    }
     await Notification.updateOne({dedupeKey:`booking-${b.id}-${b.status}`}, {
       $setOnInsert: { userId:b.user_id, type:'booking', isRead:false,
         title:cancelled?'Booking cancelled':'Booking confirmed',

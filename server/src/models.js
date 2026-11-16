@@ -29,9 +29,30 @@ const notificationSchema = new Schema({
   dedupeKey: { type: String, sparse: true, unique: true }
 }, opts);
 
+const userActivityLogSchema = new Schema({
+  userId: { type: Number, required: true, min: 1 },
+  action_type: {
+    type: String,
+    required: true,
+    enum: ['booking_confirmed', 'booking_cancelled']
+  },
+  ip_address: { type: String, default: null },
+  metadata: { type: Schema.Types.Mixed, default: () => ({}) },
+  timestamp: { type: Date, required: true, default: Date.now },
+  dedupeKey: { type: String, required: true, unique: true }
+}, opts);
+
+userActivityLogSchema.index({ userId: 1, timestamp: -1 });
+
 export const Cart = mongoose.model('Cart', cartSchema, 'carts');
 export const Review = mongoose.model('Review', reviewSchema, 'reviews');
 export const Wishlist = mongoose.model('Wishlist', wishlistSchema, 'wishlists');
 export const Notification = mongoose.model('Notification', notificationSchema, 'notifications');
+
+export const UserActivityLog = mongoose.model(
+  'UserActivityLog',
+  userActivityLogSchema,
+  'user_activity_logs'
+);
 
 export const collections = { carts: Cart, reviews: Review, wishlists: Wishlist, notifications: Notification };
