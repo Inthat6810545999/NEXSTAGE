@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import { pool } from './config.js';
 import { collections } from './models.js';
 import { cancelBooking, createBooking, syncBooking } from './booking.js';
@@ -39,11 +40,24 @@ function validateSql(table, p) {
   if (table==='ticket_types' && o.available !== undefined && o.capacity!==undefined && o.available>o.capacity) throw new HttpError(400,'Available exceeds capacity');
   return o;
 }
+const logActions=['booking_confirmed','booking_cancelled'];
+function logPayload(body,isCreate){
+  const p=pick(body,['userId','action_type','ip_address','metadata','timestamp']);
+  if(isCreate||p.userId!==undefined) p.userId=mustInt(p.userId,'userId');
+  if(isCreate||p.action_type!==undefined) enumCheck(p.action_type,logActions,'action_type');
+  if(p.metadata!==undefined&&(typeof p.metadata!=='object'||Array.isArray(p.metadata)||p.metadata===null)) throw new HttpError(400,'metadata must be an object');
+  if(p.timestamp!==undefined&&Number.isNaN(new Date(p.timestamp).getTime())) throw new HttpError(400,'Invalid timestamp');
+  if(isCreate) p.dedupeKey=`manual-${randomUUID()}`;
+  if(!Object.keys(p).length) throw new HttpError(400,'No editable fields provided');
+  return p;
+}
+
 const sqlTable = t => Object.prototype.hasOwnProperty.call(selects,t);
 export async function listAdmin(table) {
   if (sqlTable(table)) { const [rows]=await pool.query(selects[table]); return rows; }
   const Model=collections[table];
   if (!Model) throw new HttpError(404,'Unknown entity');
+  if (table==='user_activity_logs') return Model.find({}).sort({timestamp:-1}).limit(100).lean();
   return Model.find({}).sort({createdAt:-1}).limit(100).lean();
 }
 async function sqlCreate(table, body) {
@@ -134,11 +148,13 @@ async function modifyItem(action,id,body) {
 export async function createAdmin(table,body) {
   if (sqlTable(table)) return sqlCreate(table,body);
   const Model=collections[table]; if(!Model) throw new HttpError(404,'Unknown entity');
+  if (table==='user_activity_logs') body=logPayload(body,true);
   const doc=await Model.create(body); return doc.toObject();
 }
 export async function updateAdmin(table,rawId,body) {
   if (sqlTable(table)) return sqlUpdate(table,mustInt(rawId),body);
   const Model=collections[table]; if(!Model) throw new HttpError(404,'Unknown entity');
+  if (table==='user_activity_logs') body=logPayload(body,false);
   const doc=await Model.findByIdAndUpdate(rawId,{$set:body},{new:true,runValidators:true});
   if(!doc) throw new HttpError(404,'Record not found');
   return doc;
