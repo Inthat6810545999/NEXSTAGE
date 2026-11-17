@@ -46,9 +46,10 @@ export default function NexAIMascot() {
               * smoothstep(0.06, 0.16, -position.z)
               * smoothstep(-0.35, -0.25, position.y)
               * (1.0 - smoothstep(0.08, 0.18, position.y));
-            float swing = sin(danceBeat + sign(position.x) * 1.57);
-            transformed.y += arm * 0.035 * swing;
-            transformed.x += arm * 0.025 * swing;
+            float side = sign(position.x);
+            float pump = sin(danceBeat + side * 1.57);
+            transformed.y += arm * 0.05 * pump;
+            transformed.x += arm * side * 0.025 * pump;
           `);
         };
       });
@@ -77,14 +78,16 @@ export default function NexAIMascot() {
     const draw = () => {
       if (!reduced.matches) {
         const time = clock.getElapsedTime();
-        const beat = time * 7.5;
+        const beat = time * 7.2;
         danceBeat.value = beat;
-        dancer.position.x = Math.sin(beat * 0.5) * 0.2;
-        dancer.position.y = Math.pow(Math.abs(Math.sin(beat)), 2) * 0.2;
-        dancer.rotation.z = Math.sin(beat * 0.5) * 0.17;
-        dancer.rotation.x = Math.sin(beat) * 0.055;
-        dancer.rotation.y = time * 0.3;
-        dancer.scale.set(1 + Math.sin(beat) * 0.035, 1 - Math.sin(beat) * 0.04, 1);
+        const step = Math.sin(beat * 0.5);
+        const bounce = Math.pow(Math.max(0, Math.sin(beat)), 2);
+        dancer.position.x = step * 0.19;
+        dancer.position.y = bounce * 0.17;
+        dancer.rotation.z = step * 0.18 + Math.sin(beat * 2) * 0.035;
+        dancer.rotation.x = Math.sin(beat) * 0.07;
+        dancer.rotation.y = time * 0.3 + step * 0.14;
+        dancer.scale.set(1 + bounce * 0.035, 1 - bounce * 0.045, 1);
       }
       renderer.render(scene, camera);
       frame = requestAnimationFrame(draw);

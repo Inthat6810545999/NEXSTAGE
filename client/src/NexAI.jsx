@@ -1,4 +1,5 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRight, Send, Sparkles } from 'lucide-react';
 import './next-ai.css';
 
@@ -18,6 +19,28 @@ export default function NexAI({ request, onOpen, money }) {
   const [petPosition, setPetPosition] = useState(null);
   const petDrag = useRef(null);
   const cardRef = useRef(null);
+  const petWasMoved = useRef(false);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const placePet = () => {
+      if (petWasMoved.current) return;
+      const rect = card.getBoundingClientRect();
+      const compact = window.matchMedia('(max-width: 560px)').matches;
+      setPetPosition({ left: rect.right - (compact ? 120 : 155), top: rect.top - (compact ? 88 : 62) });
+    };
+    const observer = new ResizeObserver(placePet);
+    observer.observe(card);
+    window.addEventListener('resize', placePet);
+    window.addEventListener('scroll', placePet, true);
+    placePet();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', placePet);
+      window.removeEventListener('scroll', placePet, true);
+    };
+  }, []);
 
   function startPetDrag(event) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -28,12 +51,10 @@ export default function NexAI({ request, onOpen, money }) {
   function movePet(event) {
     if (!petDrag.current) return;
     const { x, y, width, height } = petDrag.current;
-    const cardRect = cardRef.current.getBoundingClientRect();
+    petWasMoved.current = true;
     setPetPosition({
-      left: Math.max(8, Math.min(window.innerWidth - width - 8, event.clientX - x)) - cardRect.left,
-      top: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - y)) - cardRect.top,
-      right: 'auto',
-      bottom: 'auto',
+      left: Math.max(8, Math.min(window.innerWidth - width - 8, event.clientX - x)),
+      top: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - y)),
     });
   }
 
@@ -53,6 +74,7 @@ export default function NexAI({ request, onOpen, money }) {
   }
 
   return (
+    <>
     <section className="container subpage next-ai">
       <div className="next-ai-hero">
         <div className="subpage-head">
@@ -95,10 +117,13 @@ export default function NexAI({ request, onOpen, money }) {
             })}
           </div>
         )}
-        <aside className="next-ai-pet" style={petPosition || undefined} aria-label="NexAI pet" title="Drag to move" onPointerDown={startPetDrag} onPointerMove={movePet} onPointerUp={() => { petDrag.current = null; }} onPointerCancel={() => { petDrag.current = null; }}>
-          <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot /></Suspense></div>
-        </aside>
       </div>
     </section>
+    {petPosition && createPortal(
+      <aside className="next-ai-pet" style={petPosition} aria-label="NexAI pet" title="Drag to move" onPointerDown={startPetDrag} onPointerMove={movePet} onPointerUp={() => { petDrag.current = null; }} onPointerCancel={() => { petDrag.current = null; }}>
+        <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot /></Suspense></div>
+      </aside>, document.body
+    )}
+    </>
   );
 }
