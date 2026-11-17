@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { validatePassword } from './password.js';
 import { randomUUID } from 'node:crypto';
 import { pool } from './config.js';
 import { collections } from './models.js';
@@ -63,8 +64,7 @@ export async function listAdmin(table) {
 async function sqlCreate(table, body) {
   if (table==='users') {
     const p=validateSql(table,pick(body,sqlFields.users));
-    const password=mustText(body.password,'password',72);
-    if(password.length<8) throw new HttpError(400,'Password must be at least 8 characters');
+    const password=validatePassword(body.password);
     const hash=await bcrypt.hash(password,10);
     const [r]=await pool.query('INSERT INTO users (display_name,email,role,password_hash) VALUES (?,?,?,?)',[p.display_name,p.email,p.role||'customer',hash]);
     return {id:r.insertId};
@@ -92,8 +92,7 @@ async function sqlUpdate(table, id, body) {
   if (table==='booking_items') return modifyItem('update',id,body);
   const p=validateSql(table,pick(body,sqlFields[table]||[]));
   if(table==='users' && body.password!==undefined) {
-    const pwd=mustText(body.password,'password',72);
-    if (pwd.length<8) throw new HttpError(400,'Password must be at least 8 characters');
+    const pwd=validatePassword(body.password);
     p.password_hash=await bcrypt.hash(pwd,10);
   }
   const fields=Object.keys(p);
