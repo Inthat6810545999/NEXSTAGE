@@ -102,13 +102,21 @@ function AuthModal({onClose,onSuccess,notify}){
     </form><div className="demo-login"><strong>Demo account</strong><span>student@nexstage.local / Demo12345!</span><button onClick={()=>{setEmail('admin@nexstage.local');setPassword('Demo12345!');setMode('login');}}>Use admin account instead <ArrowRight size={13}/></button></div>
   </Modal>;
 }
-function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed}) {
-  const [choice,setChoice]=useState(event.tickets?.[0]?.id);const [qty,setQty]=useState(1);
-  const [rating,setRating]=useState(5);const [review,setReview]=useState('');const [reviews,setReviews]=useState([]);const [busy,setBusy]=useState(false);
-  const [venueMode, setVenueMode] = useState(null);
+function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed,cartItems=[]}) {
+  const tickets = event.tickets || [];
+  const [choice,setChoice] = useState(tickets.find(t=>Number(t.available)>0)?.id ?? tickets[0]?.id);
+  const [qty,setQty] = useState(1);
+  const [rating,setRating] = useState(5);
+  const [review,setReview] = useState('');
+  const [reviews,setReviews] = useState([]);
+  const [busy,setBusy] = useState(false);
+  const [adding,setAdding] = useState(false);
+  const [addError,setAddError] = useState('');
+  const [venueMode,setVenueMode] = useState(null);
   const venueButtons = useRef({});
   const returnFocus = useRef(null);
   const hasVenuePreview = event.venue?.trim().toLowerCase() === 'impact arena';
+
   useEffect(() => {
     if (!venueMode && returnFocus.current) venueButtons.current[returnFocus.current]?.focus();
   }, [venueMode]);
@@ -117,32 +125,128 @@ function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed}) {
     setVenueMode(mode);
   }
   useEffect(()=>{api(`/reviews?eventId=${event.id}`).then(r=>setReviews(r.reviews)).catch(()=>{});},[event.id]);
-  const ticket=event.tickets.find(t=>t.id===Number(choice))||event.tickets[0];
+
+  const ticket = tickets.find(t=>String(t.id)===String(choice)) || tickets[0];
+  const available = Math.max(0,Number(ticket?.available)||0);
+  const alreadyInCart = Number(cartItems.find(i=>String(i.ticketTypeId)===String(ticket?.id))?.quantity)||0;
+  const maxQty = Math.max(0,Math.min(20-alreadyInCart,available-alreadyInCart));
+  const selectedQty = Math.max(1,Math.min(qty,maxQty||1));
+  const hasStock = Boolean(ticket && maxQty>0);
+
+  async function addSelectedTicket() {
+    if(adding || !hasStock) return;
+    setAddError('');
+    setAdding(true);
+    try {
+      const result = await onAdd(ticket,selectedQty);
+      if(result?.error) setAddError(result.error);
+    } catch(err) {
+      setAddError(err.message || 'Could not add the ticket. Please try again.');
+    } finally {
+      setAdding(false);
+    }
+  }
   async function submitReview(e){e.preventDefault();if(!user)return onLogin();setBusy(true);try{await api('/reviews',{method:'POST',body:{eventId:event.id,rating,text:review}});setReview('');onReviewed?.();const r=await api(`/reviews?eventId=${event.id}`);setReviews(r.reviews);notify('Review published');}catch(err){notify(err.message,'error');}finally{setBusy(false);}}
-  if (venueMode) return <Modal wide onClose={onClose} label={event.title + ' venue preview'}>
+
+  if(venueMode) return <Modal wide onClose={onClose} label={event.title + ' venue preview'}>
     <VenuePreview event={event} mode={venueMode} onMode={setVenueMode} onBack={()=>setVenueMode(null)} />
   </Modal>;
-  return <Modal wide onClose={onClose} label={event.title}><div className="detail-layout"><div className="detail-left"><img className="detail-poster" src={event.poster_path} alt={`${event.title} poster`}/><div className="detail-reviews"><div className="section-row"><h3>Community reviews</h3><Pill>{reviews.length} reviews</Pill></div>{reviews.length?reviews.slice(0,3).map(r=><div className="review-item" key={r._id}><span className="review-stars">{'★'.repeat(r.rating)}</span><p>{r.text}</p></div>):<p className="muted">Be the first to review this event.</p>}
-    <form onSubmit={submitReview} className="review-form"><div className="rating-select">{[1,2,3,4,5].map(i=><button type="button" key={i} className={i<=rating?'star-on':'star-off'} onClick={()=>setRating(i)}>★</button>)}</div><input required maxLength={1500} placeholder="Share your thoughts…" value={review} onChange={e=>setReview(e.target.value)}/><button className="mini-submit" disabled={busy} aria-label="Post review"><Send size={17}/></button></form></div></div>
-    <div className="detail-right"><Pill kind="purple">{event.category}</Pill><h2>{event.title}</h2>
-      <div className="event-detail-tags">{audienceTags(event).map(g=><span key={g}><Users size={12}/>{audienceName(g)}</span>)}{benefitTags(event).map(k=><span key={k}><Award size={12}/>{benefitOptions.find(b=>b.id===k)?.name||k}</span>)}</div><p className="detail-description">{event.description}</p><div className="detail-info"><div><CalendarDays size={18}/><span><b>{readableDate(event.start_at)}</b><small>{new Date(event.start_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</small></span></div><div><MapPin size={18}/><span><b>{event.venue}</b><small>{event.city}, Thailand</small></span></div></div>
-      {hasVenuePreview && <div className="venue-entry" aria-label="Explore seating">
-        <button type="button" ref={element=>{venueButtons.current['3d']=element;}} onClick={()=>openVenue('3d')}><Box size={16}/> 3D Preview</button>
-        <button type="button" ref={element=>{venueButtons.current['2d']=element;}} onClick={()=>openVenue('2d')}><MapIcon size={16}/> 2D Map</button>
-      </div>}
-      <div className="ticket-picker"><div className="ticket-picker-top"><strong>Choose your ticket</strong><span>Prices in THB</span></div>{event.tickets.map(t=><button key={t.id} onClick={()=>{setChoice(t.id);setQty(1);}} className={classes('ticket-choice',choice===t.id&&'selected')}><span className="radio-dot"/><span className="ticket-choice-title"><strong>{t.label}</strong><small>{t.available} seats left</small></span><b>{money(t.price)}</b></button>)}</div>
-      <div className="qty-and-total"><div className="qty-toggle"><button onClick={()=>setQty(Math.max(1,qty-1))} aria-label="Decrease"><Minus size={16}/></button><strong>{qty}</strong><button onClick={()=>setQty(Math.min(20,qty+1))} aria-label="Increase"><Plus size={16}/></button></div><div className="total"><span>Total</span><strong>{money((ticket?.price||0)*qty)}</strong></div></div>
-      <Button className="full" disabled={!ticket} onClick={()=>onAdd(ticket,qty)}><ShoppingBag size={18}/> Add to cart <ArrowRight size={17}/></Button><p className="secure-note"><ShieldCheck size={15}/> Secure local demo booking · No real payments</p>
-    </div></div></Modal>;
+
+  return <Modal wide onClose={onClose} label={event.title}>
+    <div className="detail-layout">
+      <div className="detail-left">
+        <img className="detail-poster" src={event.poster_path} alt={`${event.title} poster`}/>
+        <div className="detail-reviews">
+          <div className="section-row"><h3>Community reviews</h3><Pill>{reviews.length} reviews</Pill></div>
+          {reviews.length ? reviews.slice(0,3).map(r=><div className="review-item" key={r._id}><span className="review-stars">{'★'.repeat(r.rating)}</span><p>{r.text}</p></div>) : <p className="muted">Be the first to review this event.</p>}
+          <form onSubmit={submitReview} className="review-form">
+            <div className="rating-select">{[1,2,3,4,5].map(i=><button type="button" key={i} className={i<=rating?'star-on':'star-off'} onClick={()=>setRating(i)} aria-label={`Rate ${i} stars`}>★</button>)}</div>
+            <input required maxLength={1500} placeholder="Share your thoughts…" value={review} onChange={e=>setReview(e.target.value)}/>
+            <button type="submit" className="mini-submit" disabled={busy} aria-label="Post review"><Send size={17}/></button>
+          </form>
+        </div>
+      </div>
+      <div className="detail-right">
+        <Pill kind="purple">{event.category}</Pill><h2>{event.title}</h2>
+        <div className="event-detail-tags">{audienceTags(event).map(g=><span key={g}><Users size={12}/>{audienceName(g)}</span>)}{benefitTags(event).map(k=><span key={k}><Award size={12}/>{benefitOptions.find(b=>b.id===k)?.name||k}</span>)}</div>
+        <p className="detail-description">{event.description}</p>
+        <div className="detail-info">
+          <div><CalendarDays size={18}/><span><b>{readableDate(event.start_at)}</b><small>{new Date(event.start_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</small></span></div>
+          <div><MapPin size={18}/><span><b>{event.venue}</b><small>{event.city}, Thailand</small></span></div>
+        </div>
+        {hasVenuePreview && <div className="venue-entry" aria-label="Explore seating">
+          <button type="button" ref={element=>{venueButtons.current['3d']=element;}} onClick={()=>openVenue('3d')}><Box size={16}/> 3D Preview</button>
+          <button type="button" ref={element=>{venueButtons.current['2d']=element;}} onClick={()=>openVenue('2d')}><MapIcon size={16}/> 2D Map</button>
+        </div>}
+        <div className="ticket-picker">
+          <div className="ticket-picker-top"><strong>Choose your ticket</strong><span>Prices in THB</span></div>
+          {tickets.length ? tickets.map(t=>{
+            const soldOut = Number(t.available)<=0;
+            return <button type="button" key={t.id} disabled={adding||soldOut} onClick={()=>{setChoice(t.id);setQty(1);setAddError('');}} aria-pressed={String(choice)===String(t.id)} className={classes('ticket-choice',String(choice)===String(t.id)&&'selected',soldOut&&'sold-out')}>
+              <span className="radio-dot"/><span className="ticket-choice-title"><strong>{t.label}</strong><small>{soldOut?'Sold out':`${t.available} seats left`}</small></span><b>{money(t.price)}</b>
+            </button>;
+          }) : <p className="buyer-note">No ticket types are available for this event.</p>}
+        </div>
+        <div className="qty-and-total">
+          <div className="qty-toggle" aria-label="Ticket quantity">
+            <button type="button" onClick={()=>setQty(Math.max(1,selectedQty-1))} disabled={adding||!hasStock||selectedQty<=1} aria-label="Decrease ticket quantity"><Minus size={16}/></button>
+            <strong aria-live="polite">{hasStock?selectedQty:0}</strong>
+            <button type="button" onClick={()=>setQty(Math.min(maxQty,selectedQty+1))} disabled={adding||!hasStock||selectedQty>=maxQty} aria-label="Increase ticket quantity"><Plus size={16}/></button>
+          </div>
+          <div className="total"><span>Total</span><strong>{money((ticket?.price||0)*(hasStock?selectedQty:0))}</strong></div>
+        </div>
+        {ticket && <p className="buyer-note" aria-live="polite">{available===0?'This ticket is sold out.':maxQty===0?'No more of this ticket can be added to your cart.':`You can add up to ${maxQty} more ticket${maxQty===1?'':'s'} (20 per ticket type).`}</p>}
+        {addError && <p className="buyer-inline-error" role="alert"><AlertCircle size={16}/>{addError}</p>}
+        <Button className="full" disabled={!hasStock||adding} onClick={addSelectedTicket}>
+          {adding?<><LoaderCircle className="buyer-spinner" size={18}/> Adding to cart…</>:<><ShoppingBag size={18}/> {available===0?'Sold out':'Add to cart'} <ArrowRight size={17}/></>}
+        </Button>
+        <p className="secure-note"><ShieldCheck size={15}/> Secure local demo booking · No real payments</p>
+      </div>
+    </div>
+  </Modal>;
 }
-function CartPanel({cart,onClose,events,onUpdate,onCheckout,loading}){
+
+function CartPanel({cart,onClose,events,onUpdate,onCheckout,loading,updating,error}) {
   const choices=events.flatMap(e=>(e.tickets||[]).map(t=>({...t,event:e})));
-  const enriched=(cart?.items||[]).map(i=>({...i,ticket:choices.find(t=>t.id===i.ticketTypeId)})).filter(i=>i.ticket);
-  const total=enriched.reduce((n,i)=>n+i.ticket.price*i.quantity,0);
-  return <div className="drawer-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><aside className="drawer"><div className="drawer-head"><div><div className="eyebrow">YOUR SELECTION</div><h2>My ticket cart <span>({enriched.length})</span></h2></div><button className="icon-btn" onClick={onClose}><X/></button></div>
-    <div className="drawer-list">{enriched.length?enriched.map(i=><div className="cart-item" key={i.ticketTypeId}><img src={i.ticket.event.poster_path} alt=""/><div><strong>{i.ticket.event.title}</strong><span>{i.ticket.label} · {money(i.ticket.price)}</span><div className="cart-qty"><button onClick={()=>onUpdate(i.ticketTypeId,i.quantity-1)}><Minus size={13}/></button><b>{i.quantity}</b><button onClick={()=>onUpdate(i.ticketTypeId,i.quantity+1)}><Plus size={13}/></button><button className="cart-remove" onClick={()=>onUpdate(i.ticketTypeId,0)}><Trash2 size={15}/></button></div></div></div>):<div className="empty-spot"><ShoppingBag size={44}/><h3>Nothing in your cart yet</h3><p>Discover something exciting and add tickets here.</p><Button variant="secondary" onClick={onClose}>Explore events</Button></div>}</div>
-    <div className="drawer-bottom"><div className="sum-row"><span>Subtotal</span><strong>{money(total)}</strong></div><p><ShieldCheck size={14}/> Demo checkout · no charge will be made</p><Button className="full" disabled={!enriched.length||loading} onClick={onCheckout}>{loading?'Processing booking…':'Confirm booking'} <ArrowRight size={17}/></Button></div>
-  </aside></div>;
+  const enriched=(cart?.items||[]).map(i=>({...i,ticket:choices.find(t=>String(t.id)===String(i.ticketTypeId))})).filter(i=>i.ticket);
+  const total=enriched.reduce((n,i)=>n+Number(i.ticket.price)*i.quantity,0);
+  const hasMissingItems=(cart?.items||[]).length!==enriched.length;
+  const hasStockIssue=enriched.some(i=>i.quantity>20 || i.quantity>Math.max(0,Number(i.ticket.available)||0));
+  const locked=loading||updating;
+  return <div className="drawer-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!locked&&onClose()}>
+    <aside className="drawer" role="dialog" aria-modal="true" aria-label="Ticket cart">
+      <div className="drawer-head"><div><div className="eyebrow">YOUR SELECTION</div><h2>My ticket cart <span>({enriched.length})</span></h2></div><button className="icon-btn" onClick={onClose} disabled={locked} aria-label="Close cart"><X/></button></div>
+      <div className="drawer-list">
+        {enriched.length?enriched.map(i=>{
+          const remaining=Math.max(0,Number(i.ticket.available)||0);
+          const maxAllowed=Math.min(20,remaining);
+          const lowStock=i.quantity>maxAllowed;
+          return <div className="cart-item" key={i.ticketTypeId}>
+            <img src={i.ticket.event.poster_path} alt={`${i.ticket.event.title} poster`}/>
+            <div><strong>{i.ticket.event.title}</strong><span>{i.ticket.label} · {money(i.ticket.price)}</span>
+              <span className={classes('buyer-stock-label',lowStock&&'buyer-stock-warning')}>{lowStock?`Only ${remaining} seats available`:`${remaining} seats left`}</span>
+              <div className="cart-qty">
+                <button type="button" disabled={locked||i.quantity<=1} onClick={()=>onUpdate(i.ticketTypeId,Math.min(maxAllowed,i.quantity-1))} aria-label={`Decrease ${i.ticket.label}`}><Minus size={13}/></button>
+                <b>{i.quantity}</b>
+                <button type="button" disabled={locked||i.quantity>=maxAllowed} onClick={()=>onUpdate(i.ticketTypeId,i.quantity+1)} aria-label={`Increase ${i.ticket.label}`}><Plus size={13}/></button>
+                <button type="button" disabled={locked} className="cart-remove" onClick={()=>onUpdate(i.ticketTypeId,0)} aria-label={`Remove ${i.ticket.label}`}><Trash2 size={15}/></button>
+              </div>
+            </div>
+          </div>;
+        }):<div className="empty-spot"><ShoppingBag size={44}/><h3>Nothing in your cart yet</h3><p>Discover something exciting and add tickets here.</p><Button variant="secondary" onClick={onClose}>Explore events</Button></div>}
+      </div>
+      <div className="drawer-bottom">
+        {updating&&<p className="buyer-processing" role="status"><LoaderCircle className="buyer-spinner" size={16}/> Updating your cart…</p>}
+        {error&&<p className="buyer-inline-error" role="alert"><AlertCircle size={16}/>{error}</p>}
+        {(hasStockIssue||hasMissingItems)&&<p className="buyer-inline-error" role="alert"><AlertCircle size={16}/> Some tickets are unavailable or exceed remaining stock. Remove or reduce them before checkout.</p>}
+        <div className="sum-row"><span>Subtotal</span><strong>{money(total)}</strong></div>
+        <p><ShieldCheck size={14}/> Demo checkout · no charge will be made</p>
+        <Button className="full" disabled={!enriched.length||locked||hasStockIssue||hasMissingItems} onClick={onCheckout}>
+          {loading?<><LoaderCircle className="buyer-spinner" size={17}/> Processing booking…</>:'Confirm booking'} {!loading&&<ArrowRight size={17}/>}
+        </Button>
+      </div>
+    </aside>
+  </div>;
 }
 function TicketQR({booking}){const [url,setUrl]=useState('');useEffect(()=>{QRCode.toDataURL(`NEXSTAGE|${booking.booking_code}|${booking.id}`,{margin:1,width:168,color:{dark:'#4a2389',light:'#FFFFFF'}}).then(setUrl).catch(()=>{});},[booking]);return url?<img className="qr" src={url} alt={`QR code for ${booking.booking_code}`}/>:<div className="qr-placeholder"><Ticket size={44}/></div>;}
 function TicketsPage({bookings,onCancel,notify}){
@@ -239,6 +343,11 @@ export default function App(){
   const [events,setEvents]=useState(demoEvents);const [serverOnline,setServerOnline]=useState(true);const [user,setUser]=useState(null);const [page,setPage]=useState('home');const [category,setCategory]=useState('All events');const [audience,setAudience]=useState('all');const [search,setSearch]=useState('');const [favorites,setFavorites]=useState([]);const [cart,setCart]=useState({items:[]});const [notifications,setNotifications]=useState([]);const [bookings,setBookings]=useState([]);
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('nexstage-theme')==='dark'?'dark':'light';}catch{return 'light';}});
   const [modal,setModal]=useState(null);const [selectedEvent,setSelectedEvent]=useState(null);const [toast,setToast]=useState(null);const [busy,setBusy]=useState(false);const [mobileMenu,setMobileMenu]=useState(false);
+  const [cartUpdating,setCartUpdating]=useState(false);
+  const [cartError,setCartError]=useState('');
+  const [bookingNotice,setBookingNotice]=useState('');
+  const cartRequestPending=useRef(false);
+  const checkoutPending=useRef(false);
   function notify(text,type='success'){setToast({text,type,id:Date.now()});}
   useEffect(()=>{if(!toast)return;const id=setTimeout(()=>setToast(null),4300);return()=>clearTimeout(id);},[toast]);
   useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('nexstage-theme',theme);}catch{}},[theme]);
@@ -254,9 +363,88 @@ export default function App(){
   const liked=events.filter(e=>favorites.includes(e.id));
   const count=(cart?.items||[]).reduce((n,i)=>n+i.quantity,0);
   function needAuth(){if(!serverOnline){notify('Preview mode — start MySQL, MongoDB and the API to use live features.','error');return false;}if(!user){setModal('auth');notify('Log in to continue','error');return false;}return true;}
-  async function addToCart(ticket,qty){if(!needAuth())return;try{const items=[...(cart.items||[])];const old=items.find(i=>i.ticketTypeId===ticket.id);if(old)old.quantity=Math.min(20,old.quantity+qty);else items.push({ticketTypeId:ticket.id,quantity:qty});const r=await api('/cart',{method:'PUT',body:{items}});setCart(r.cart);setSelectedEvent(null);setModal('cart');notify('Added to your ticket cart');}catch(err){notify(err.message,'error');}}
-  async function updateCart(id,quantity){try{const items=cart.items.filter(i=>i.ticketTypeId!==id);if(quantity>0)items.push({ticketTypeId:id,quantity:Math.min(20,quantity)});const r=await api('/cart',{method:'PUT',body:{items}});setCart(r.cart);}catch(err){notify(err.message,'error');}}
-  async function checkout(){if(!needAuth())return;setBusy(true);try{const r=await api('/checkout',{method:'POST'});setModal(null);await refreshUser();const updated=await api('/events');setEvents(updated.events);setPage('tickets');notify(`Booking confirmed — ${r.booking.booking_code}`);}catch(err){notify(err.message,'error');}finally{setBusy(false);}}
+  async function addToCart(ticket,qty) {
+    if(!needAuth()) return {cancelled:true};
+    if(cartRequestPending.current) return {error:'Please finish the current cart update first.'};
+    cartRequestPending.current=true;
+    setCartError('');
+    try {
+      const items=(cart.items||[]).map(i=>({...i}));
+      const existing=items.find(i=>String(i.ticketTypeId)===String(ticket.id));
+      const currentQty=Number(existing?.quantity)||0;
+      const maxAllowed=Math.min(20,Math.max(0,Number(ticket.available)||0));
+      if(!Number.isInteger(qty)||qty<1||currentQty+qty>maxAllowed) {
+        throw new Error(`You can add at most ${Math.max(0,maxAllowed-currentQty)} more of this ticket.`);
+      }
+      if(existing) existing.quantity=currentQty+qty;
+      else items.push({ticketTypeId:ticket.id,quantity:qty});
+      const result=await api('/cart',{method:'PUT',body:{items}});
+      setCart(result.cart);
+      setSelectedEvent(null);
+      setModal('cart');
+      notify('Added to your ticket cart');
+      return {ok:true};
+    } catch(err) {
+      return {error:err.message||'Unable to add tickets. Please try again.'};
+    } finally {
+      cartRequestPending.current=false;
+    }
+  }
+  async function updateCart(id,quantity) {
+    if(cartRequestPending.current || checkoutPending.current) return;
+    cartRequestPending.current=true;
+    setCartUpdating(true);
+    setCartError('');
+    try {
+      const tickets=events.flatMap(event=>event.tickets||[]);
+      const selected=tickets.find(t=>String(t.id)===String(id));
+      const maxAllowed=Math.min(20,Math.max(0,Number(selected?.available)||0));
+      if(quantity>maxAllowed) throw new Error(`Only ${maxAllowed} ticket(s) are available.`);
+      const items=(cart.items||[]).filter(i=>String(i.ticketTypeId)!==String(id)).map(i=>({...i}));
+      if(quantity>0) items.push({ticketTypeId:id,quantity});
+      const result=await api('/cart',{method:'PUT',body:{items}});
+      setCart(result.cart);
+    } catch(err) {
+      setCartError(err.message||'Could not update the cart. Please try again.');
+    } finally {
+      cartRequestPending.current=false;
+      setCartUpdating(false);
+    }
+  }
+  async function checkout() {
+    if(checkoutPending.current||cartRequestPending.current||!needAuth()) return;
+    checkoutPending.current=true;
+    setBusy(true);
+    setCartError('');
+    setBookingNotice('');
+    try {
+      const result=await api('/checkout',{method:'POST'});
+      // A successful checkout response is authoritative. A later refresh failure
+      // must never tell the customer that their booking failed.
+      const confirmed=result.booking;
+      setCart({items:[]});
+      setModal(null);
+      setPage('tickets');
+      window.scrollTo({top:0,behavior:'smooth'});
+      if(confirmed?.id && confirmed?.booking_code) {
+        setBookings(prev=>[{
+          status:'confirmed',created_at:new Date().toISOString(),...confirmed
+        },...prev.filter(b=>b.id!==confirmed.id)]);
+      }
+      const reference=confirmed?.booking_code||'see My tickets';
+      notify(`Booking confirmed — ${reference}`);
+      const results=await Promise.allSettled([refreshUser(),api('/events')]);
+      if(results[1].status==='fulfilled') setEvents(results[1].value.events);
+      if(results.some(r=>r.status==='rejected')) {
+        setBookingNotice(`Your booking ${reference} was confirmed, but some information could not refresh. Reopen My tickets to try again.`);
+      }
+    } catch(err) {
+      setCartError(err.message||'Booking could not be completed. Please try again.');
+    } finally {
+      setBusy(false);
+      checkoutPending.current=false;
+    }
+  }
   async function toggleFavorite(id){if(!needAuth())return;try{const r=await api(`/wishlist/${id}`,{method:'POST'});setFavorites(r.eventIds);notify(r.eventIds.includes(id)?'Added to your favorites':'Removed from favorites');}catch(err){notify(err.message,'error');}}
   async function cancelBooking(id){if(!window.confirm('Cancel this booking and restore ticket inventory?'))return;try{await api(`/bookings/${id}/cancel`,{method:'POST'});await refreshUser();notify('Booking cancelled and ticket stock restored');const r=await api('/events');setEvents(r.events);}catch(err){notify(err.message,'error');}}
   function nav(p){setMobileMenu(false);if(['tickets','favorites','notifications','admin'].includes(p)&&!needAuth())return;if(p==='admin'&&user?.role!=='admin')return;setPage(p);window.scrollTo({top:0,behavior:'smooth'});}
@@ -281,7 +469,7 @@ export default function App(){
       </>}
       {page==='assistant'&&<NexAI request={api} onOpen={showEvent} money={money}/>}
       {page==='settings'&&<SettingsPage theme={theme} onThemeChange={setTheme}/>}
-      {page==='tickets'&&<div className="container"><TicketsPage bookings={bookings} onCancel={cancelBooking} notify={notify}/></div>}
+      {page==='tickets'&&<div className="container">{bookingNotice&&<div className="buyer-booking-notice" role="status"><CheckCircle2 size={19}/><span>{bookingNotice}</span><button type="button" onClick={async()=>{try{await refreshUser();setBookingNotice('');}catch(err){setBookingNotice(`Booking confirmed, but the ticket list is still unavailable: ${err.message}`);}}}>Retry refresh</button></div>}<TicketsPage bookings={bookings} onCancel={cancelBooking} notify={notify}/></div>}
       {page==='favorites'&&<section className="container subpage"><div className="subpage-head"><Pill kind="purple"><Heart size={13}/> SAVED EXPERIENCES</Pill><h1>Events close to your heart.</h1><p>Keep your favorite experiences in one place.</p></div>{liked.length?<div className="event-grid">{liked.map(e=><EventCard key={e.id} event={e} onOpen={showEvent} favorite onToggleFavorite={toggleFavorite}/>)}</div>:<Empty icon={<Heart/>} title="No favorites yet" text="Tap the heart on any event to save it for later."/>}</section>}
       {page==='notifications'&&<section className="container subpage narrow"><div className="subpage-head"><Pill kind="purple"><Bell size={13}/> YOUR NOTIFICATIONS</Pill><h1>Stay in the loop.</h1><p>Updates about your bookings and NEXSTAGE.</p></div>{notifications.length?notifications.map(n=><button className={classes('notification-card',!n.isRead&&'unread')} key={n._id} onClick={()=>readNotification(n._id)}><div className="notification-icon"><Bell size={20}/></div><div><strong>{n.title}</strong><p>{n.message}</p><small>{new Date(n.createdAt).toLocaleString()}</small></div>{!n.isRead&&<i/>}</button>):<Empty icon={<Bell/>} title="All caught up" text="You don't have any notifications yet."/>}</section>}
       {page==='admin'&&user?.role==='admin'&&<div className="container"><AdminPanel notify={notify}/></div>}
@@ -289,7 +477,7 @@ export default function App(){
     <footer className="site-footer"><div className="container footer-inner"><div><div className="brand footer-brand"><span className="brand-symbol"><Ticket size={21}/></span><span>NEX<span>STAGE</span><i>.</i></span></div><p>Find your people. Discover your moment.<br/>A local hybrid-database project.</p></div><div className="footer-links"><div><strong>Explore</strong><button onClick={()=>nav('home')}>All events</button><button onClick={()=>nav('favorites')}>Favorites</button><button onClick={()=>nav('tickets')}>My tickets</button></div><div><strong>Project</strong><span>React + Express</span><span>MySQL + MongoDB</span><span>100% Local Data</span></div></div></div><div className="footer-bottom container"><span>© 2026 NEXSTAGE · Built for database systems</span><span>Designed with <Heart size={12} fill="currentColor"/> in purple & white</span></div></footer>
     {toast&&<div role="status" className={classes('toast',toast.type==='error'&&'toast-error')}><span>{toast.type==='error'?<AlertCircle size={19}/>:<CheckCircle2 size={19}/>}</span>{toast.text}<button onClick={()=>setToast(null)}><X size={15}/></button></div>}
     {modal==='auth'&&<AuthModal onClose={()=>setModal(null)} onSuccess={async u=>{setUser(u);setServerOnline(true);await refreshUser();}} notify={notify}/>}
-    {modal==='event'&&selectedEvent&&<EventModal key={selectedEvent.id} event={selectedEvent} onClose={()=>{setModal(null);setSelectedEvent(null);}} onAdd={addToCart} user={user} onLogin={()=>setModal('auth')} notify={notify}/>}
-    {modal==='cart'&&<CartPanel cart={cart} events={events} onClose={()=>setModal(null)} onUpdate={updateCart} onCheckout={checkout} loading={busy}/>}
+    {modal==='event'&&selectedEvent&&<EventModal key={selectedEvent.id} event={selectedEvent} cartItems={cart.items||[]} onClose={()=>{setModal(null);setSelectedEvent(null);}} onAdd={addToCart} user={user} onLogin={()=>setModal('auth')} notify={notify}/>}
+    {modal==='cart'&&<CartPanel cart={cart} events={events} onClose={()=>{setCartError('');setModal(null);}} onUpdate={updateCart} onCheckout={checkout} loading={busy} updating={cartUpdating} error={cartError}/>}
   </div>;
 }
