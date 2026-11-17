@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { ArrowRight, Send, Sparkles } from 'lucide-react';
 import './next-ai.css';
+
+const NexAIMascot = lazy(() => import('./NexAIMascot'));
 
 const suggestions = [
   'มีคอนเสิร์ตในกรุงเทพงบไม่เกิน 1,000 บาทไหม?',
@@ -13,6 +15,25 @@ export default function NexAI({ request, onOpen, money }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [petPosition, setPetPosition] = useState(null);
+  const petDrag = useRef(null);
+
+  function startPetDrag(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    petDrag.current = { x: event.clientX - rect.left, y: event.clientY - rect.top, width: rect.width, height: rect.height };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function movePet(event) {
+    if (!petDrag.current) return;
+    const { x, y, width, height } = petDrag.current;
+    setPetPosition({
+      left: Math.max(8, Math.min(window.innerWidth - width - 8, event.clientX - x)),
+      top: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - y)),
+      right: 'auto',
+      bottom: 'auto',
+    });
+  }
 
   async function ask(event) {
     event.preventDefault();
@@ -30,11 +51,13 @@ export default function NexAI({ request, onOpen, money }) {
   }
 
   return (
-    <section className="container subpage narrow next-ai">
-      <div className="subpage-head">
-        <div className="eyebrow"><Sparkles size={16} /> NEXSTAGE ASSISTANT</div>
-        <h1>NexAI</h1>
-        <p>Find events, compare ticket prices, and see what fits your plans.</p>
+    <section className="container subpage next-ai">
+      <div className="next-ai-hero">
+        <div className="subpage-head">
+          <div className="eyebrow"><Sparkles size={16} /> NEXSTAGE ASSISTANT</div>
+          <h1>NexAI</h1>
+          <p>Find events, compare ticket prices, and see what fits your plans.</p>
+        </div>
       </div>
       <div className="next-ai-card">
         <form onSubmit={ask}>
@@ -71,6 +94,9 @@ export default function NexAI({ request, onOpen, money }) {
           </div>
         )}
       </div>
+      <aside className="next-ai-pet" style={petPosition || undefined} aria-label="NexAI pet" title="Drag to move" onPointerDown={startPetDrag} onPointerMove={movePet} onPointerUp={() => { petDrag.current = null; }} onPointerCancel={() => { petDrag.current = null; }}>
+        <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot /></Suspense></div>
+      </aside>
     </section>
   );
 }
