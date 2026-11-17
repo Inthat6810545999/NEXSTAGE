@@ -86,7 +86,6 @@ export default function NexAIMascot() {
         dancer.position.y = bounce * 0.17;
         dancer.rotation.z = step * 0.18 + Math.sin(beat * 2) * 0.035;
         dancer.rotation.x = Math.sin(beat) * 0.07;
-        dancer.rotation.y = time * 0.3 + step * 0.14;
         dancer.scale.set(1 + bounce * 0.035, 1 - bounce * 0.045, 1);
       }
       renderer.render(scene, camera);
