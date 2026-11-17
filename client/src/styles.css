@@ -141,3 +141,37 @@ html[data-theme="dark"] .toast{background:#392750}
 html[data-theme="dark"] .cta-band{background:linear-gradient(120deg,#34204d,#4a2864)}
 html[data-theme="dark"] .search-box input{background:transparent;color:#eee8f5}
 @media(max-width:650px){.settings-card{padding:20px}.theme-options{grid-template-columns:1fr}.theme-option{grid-template-columns:64px 1fr}.theme-preview{height:64px}}
+
+
+/* Buyer Frontend UX — Event Details, Cart, Booking (feature/buyer-frontend-ux) */
+.ticket-choice.sold-out{opacity:.55;cursor:not-allowed;background:#faf9fc}
+.ticket-choice.sold-out .ticket-choice-title small{color:#b55272;font-weight:750}
+.buyer-note{font-size:11px;color:#8c789c;line-height:1.55;margin:6px 0 14px}
+.buyer-inline-error{display:flex!important;gap:8px;align-items:flex-start;line-height:1.5;font-size:12px!important;color:#9d3154!important;background:#fff0f3;border:1px solid #f0bfd0;border-radius:10px;padding:11px 12px;margin:10px 0 13px!important}
+.buyer-inline-error svg{flex:none;margin-top:1px}
+.buyer-processing{display:flex;align-items:center;gap:8px;font-size:12px;color:#7845ba!important;margin-bottom:10px!important}
+.buyer-spinner{animation:buyer-spin 1s linear infinite;flex:none}
+@keyframes buyer-spin{to{transform:rotate(360deg)}}
+.buyer-stock-label{font-size:10px!important;color:#8f819b!important}
+.buyer-stock-warning{color:#aa3355!important;font-weight:750}
+.buyer-booking-notice{display:flex;align-items:center;gap:12px;background:#f4fff9;border:1px solid #afe1c4;border-radius:13px;color:#286f4e;font-size:13px;line-height:1.55;padding:14px 17px;margin:25px 0 -30px}
+.buyer-booking-notice svg{flex:none}
+.buyer-booking-notice span{flex:1}
+.buyer-booking-notice button{border:1px solid #92c6a6;background:white;color:#286f4e;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700}
+html[data-theme="dark"] .ticket-choice.sold-out{background:#292331}
+html[data-theme="dark"] .buyer-note,html[data-theme="dark"] .buyer-stock-label{color:#beaecd!important}
+html[data-theme="dark"] .buyer-inline-error{color:#ffbdcf!important;background:#3b2131;border-color:#8c425b}
+html[data-theme="dark"] .buyer-processing{color:#d2b6f5!important}
+html[data-theme="dark"] .buyer-booking-notice{background:#1c342d;border-color:#476e5b;color:#c5f0d4}
+html[data-theme="dark"] .buyer-booking-notice button{background:#243f32;color:#d7ffe6;border-color:#507a65}
+@media(max-width:800px){
+  .detail-layout{display:flex;flex-direction:column}
+  .detail-right{order:1}
+  .detail-left{order:2;border-top:1px solid #eee7f4}
+}
+@media(max-width:540px){
+  .buyer-booking-notice{align-items:flex-start;flex-wrap:wrap;margin-bottom:-25px}
+  .buyer-booking-notice button{margin-left:30px}
+  .qty-and-total{gap:14px}
+}
+@media(prefers-reduced-motion:reduce){.buyer-spinner{animation:none}}
