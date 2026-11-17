@@ -41,15 +41,14 @@ export default function NexAIMascot() {
           shader.vertexShader = shader.vertexShader.replace('void main() {', 'uniform float danceBeat;\nvoid main() {');
           shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
             #include <begin_vertex>
-            float side = sign(position.x);
-            float arm = smoothstep(0.21, 0.33, abs(position.x))
-              * smoothstep(-0.28, -0.15, position.y)
-              * (1.0 - smoothstep(0.04, 0.16, position.y));
-            float foot = smoothstep(0.08, 0.19, abs(position.x))
-              * (1.0 - smoothstep(-0.35, -0.22, position.y));
-            transformed.y += arm * 0.075 * sin(danceBeat * 2.0 + side * 1.57);
-            transformed.x += arm * 0.035 * sin(danceBeat * 2.0 + side * 1.57);
-            transformed.y += foot * 0.055 * max(0.0, sin(danceBeat + side * 1.57));
+            // The model faces -Z; keep the spines on its +Z back still.
+            float arm = smoothstep(0.20, 0.29, abs(position.x))
+              * smoothstep(0.06, 0.16, -position.z)
+              * smoothstep(-0.35, -0.25, position.y)
+              * (1.0 - smoothstep(0.08, 0.18, position.y));
+            float swing = sin(danceBeat + sign(position.x) * 1.57);
+            transformed.y += arm * 0.035 * swing;
+            transformed.x += arm * 0.025 * swing;
           `);
         };
       });

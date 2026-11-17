@@ -17,6 +17,7 @@ export default function NexAI({ request, onOpen, money }) {
   const [loading, setLoading] = useState(false);
   const [petPosition, setPetPosition] = useState(null);
   const petDrag = useRef(null);
+  const cardRef = useRef(null);
 
   function startPetDrag(event) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -27,9 +28,10 @@ export default function NexAI({ request, onOpen, money }) {
   function movePet(event) {
     if (!petDrag.current) return;
     const { x, y, width, height } = petDrag.current;
+    const cardRect = cardRef.current.getBoundingClientRect();
     setPetPosition({
-      left: Math.max(8, Math.min(window.innerWidth - width - 8, event.clientX - x)),
-      top: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - y)),
+      left: Math.max(8, Math.min(window.innerWidth - width - 8, event.clientX - x)) - cardRect.left,
+      top: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - y)) - cardRect.top,
       right: 'auto',
       bottom: 'auto',
     });
@@ -59,7 +61,7 @@ export default function NexAI({ request, onOpen, money }) {
           <p>Find events, compare ticket prices, and see what fits your plans.</p>
         </div>
       </div>
-      <div className="next-ai-card">
+      <div className="next-ai-card" ref={cardRef}>
         <form onSubmit={ask}>
           <label htmlFor="next-ai-question">Ask about an event</label>
           <div className="next-ai-input">
@@ -93,10 +95,10 @@ export default function NexAI({ request, onOpen, money }) {
             })}
           </div>
         )}
+        <aside className="next-ai-pet" style={petPosition || undefined} aria-label="NexAI pet" title="Drag to move" onPointerDown={startPetDrag} onPointerMove={movePet} onPointerUp={() => { petDrag.current = null; }} onPointerCancel={() => { petDrag.current = null; }}>
+          <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot /></Suspense></div>
+        </aside>
       </div>
-      <aside className="next-ai-pet" style={petPosition || undefined} aria-label="NexAI pet" title="Drag to move" onPointerDown={startPetDrag} onPointerMove={movePet} onPointerUp={() => { petDrag.current = null; }} onPointerCancel={() => { petDrag.current = null; }}>
-        <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot /></Suspense></div>
-      </aside>
     </section>
   );
 }
