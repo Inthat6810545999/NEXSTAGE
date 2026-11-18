@@ -2,11 +2,9 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-export default function NexAIMascot({ pose = 'dance', flipToken = 0 }) {
+export default function NexAIMascot({ flipToken = 0 }) {
   const hostRef = useRef(null);
-  const poseRef = useRef(pose);
   const flipRef = useRef(flipToken);
-  poseRef.current = pose;
   flipRef.current = flipToken;
   useEffect(() => {
     const host = hostRef.current;
@@ -66,11 +64,7 @@ export default function NexAIMascot({ pose = 'dance', flipToken = 0 }) {
         seenFlipToken = flipRef.current;
         flipStartedAt = time;
       }
-      if (poseRef.current === 'point') {
-        dancer.position.set(0, 0, 0);
-        dancer.rotation.set(0, 0, 0);
-        dancer.scale.set(1, 1, 1);
-      } else if (!reduced.matches) {
+      if (!reduced.matches) {
         const beat = time * 7.2;
         const step = Math.sin(beat * 0.5);
         const bounce = Math.pow(Math.max(0, Math.sin(beat)), 2);
@@ -100,5 +94,5 @@ export default function NexAIMascot({ pose = 'dance', flipToken = 0 }) {
       renderer.dispose(); renderer.domElement.remove();
     };
   }, []);
-  return <div className="nex-ai-mascot" ref={hostRef} role="img" aria-label={pose === 'point' ? 'NexAI hedgehog pointing at the answer. Drag to make it dance.' : 'Dancing NexAI hedgehog pet. Drag to move it.'}><span className="nex-ai-mascot-fallback" aria-hidden="true">✦</span></div>;
+  return <div className="nex-ai-mascot" ref={hostRef} role="img" aria-label="Dancing NexAI hedgehog pet. Drag to move it."><span className="nex-ai-mascot-fallback" aria-hidden="true">✦</span></div>;
 }

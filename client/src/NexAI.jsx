@@ -17,7 +17,6 @@ export default function NexAI({ request, onOpen, money }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [petPosition, setPetPosition] = useState(null);
-  const [petPose, setPetPose] = useState('dance');
   const [petFlip, setPetFlip] = useState(0);
   const petDrag = useRef(null);
   const suppressPetClick = useRef(false);
@@ -59,29 +58,6 @@ export default function NexAI({ request, onOpen, money }) {
     };
   }, [result]);
 
-  useEffect(() => {
-    if (petPose !== 'point') return;
-    let pointerStart;
-    const resumeDance = () => setPetPose('dance');
-    const resumeAfterMove = event => {
-      if (!pointerStart) {
-        pointerStart = { x: event.clientX, y: event.clientY };
-        return;
-      }
-      if (Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 16) resumeDance();
-    };
-    window.addEventListener('pointerdown', resumeDance, true);
-    window.addEventListener('pointermove', resumeAfterMove);
-    window.addEventListener('keydown', resumeDance);
-    window.addEventListener('wheel', resumeDance, { passive: true });
-    return () => {
-      window.removeEventListener('pointerdown', resumeDance, true);
-      window.removeEventListener('pointermove', resumeAfterMove);
-      window.removeEventListener('keydown', resumeDance);
-      window.removeEventListener('wheel', resumeDance);
-    };
-  }, [petPose]);
-
   function startPetDrag(event) {
     const rect = event.currentTarget.getBoundingClientRect();
     suppressPetClick.current = false;
@@ -96,7 +72,6 @@ export default function NexAI({ request, onOpen, money }) {
     petDrag.current.moved = true;
     suppressPetClick.current = true;
     petWasMoved.current = true;
-    setPetPose('dance');
     setPetPosition({
       left: Math.max(8, Math.min(window.innerWidth - width - 8, event.clientX - x)),
       top: Math.max(8, Math.min(window.innerHeight - height - 8, event.clientY - y)),
@@ -113,12 +88,11 @@ export default function NexAI({ request, onOpen, money }) {
     setLoading(true);
     setError('');
     setResult(null);
-    setPetPose('dance');
+    setPetFlip(value => value + 1);
     petWasMoved.current = false;
     try {
       const answer = await request('/assistant', { method: 'POST', body: { question: question.trim() } });
       setResult(answer);
-      setPetPose('point');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -174,8 +148,7 @@ export default function NexAI({ request, onOpen, money }) {
     </section>
     {petPosition && createPortal(
       <aside className="next-ai-pet" style={petPosition} role="button" tabIndex={0} aria-label="NexAI pet. Click to flip or drag to move." title="Click to flip · Drag to move" onClick={flipPet} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPetFlip(value => value + 1); } }} onPointerDown={startPetDrag} onPointerMove={movePet} onPointerUp={() => { petDrag.current = null; }} onPointerCancel={() => { petDrag.current = null; }}>
-        <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot pose={petPose} flipToken={petFlip} /></Suspense></div>
-        {petPose === 'point' && <ArrowRight className="next-ai-pet-pointer" size={26} aria-hidden="true" />}
+        <div className="next-ai-mascot-panel"><Suspense fallback={<div className="nex-ai-mascot nex-ai-mascot-loading">✦</div>}><NexAIMascot flipToken={petFlip} /></Suspense></div>
       </aside>, document.body
     )}
     </>
