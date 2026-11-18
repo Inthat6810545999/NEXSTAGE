@@ -5,7 +5,7 @@ digraph NEXSTAGE {
   client [label="REACT FRONTEND\nlocalhost:5173\nPurple & White UI"];
   api [label="NODE.JS / EXPRESS MONOLITH\nlocalhost:4000\nAuth · CRUD · Booking Transactions · Retry Worker",fillcolor="#ece0fc"];
   mysql [label="MYSQL 8.4 (LOCAL)\nUsers · Events · Ticket Types\nBookings · Booking Items"];
-  mongo [label="MONGODB 7 (LOCAL)\nCarts · Reviews\nWishlists · Notifications"];
+  mongo [label="MONGODB 7 (LOCAL)\nCarts · Reviews\nWishlists · Notifications\nUser Activity Logs"];
   media [label="LOCAL MEDIA\nSVG Poster Files\nclient/public/posters",fillcolor="#fff6fd"];
   client->api [label=" /api ", fontname="Arial", fontsize=10];
   api->mysql [label="SQL ACID",fontname="Arial",fontsize=10];
