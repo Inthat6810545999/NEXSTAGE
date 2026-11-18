@@ -6,11 +6,12 @@ digraph NOSQL {
  review[label="REVIEWS\n{userId, eventId, rating, text}" ];
  wishlist[label="WISHLISTS\n{userId, eventIds: [id]}" ];
  notification[label="NOTIFICATIONS\n{userId, title, message, type, isRead, dedupeKey}" ];
+ activity_log[label="USER_ACTIVITY_LOGS\n{userId, action_type, ip_address,\nmetadata: {bookingId, bookingCode, totalAmount},\ntimestamp, dedupeKey}\naction_type: booking_confirmed / booking_cancelled" ];
  sql[label="MYSQL BOOKING\nACID Transaction\nstatus + sync_status",fillcolor="#e8d8fa"];
- worker[label="IN-PROCESS RETRY WORKER\nIdempotent reconciliation",fillcolor="#ffeff8"];
+ worker[label="BOOKING SYNC + RETRY WORKER\nIdempotent reconciliation",fillcolor="#ffeff8"];
  cart->sql[label=" checkout items "];
  sql->worker[label=" committed booking "];
  worker->cart [label=" clear purchased items "];
  worker->notification [label=" upsert notice "];
- wishlist->review [style=dashed,color="#c9b8e0",label=" independent UI CRUD "];
+ worker->activity_log [label=" upsert audit log "];
 }
