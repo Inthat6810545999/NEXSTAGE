@@ -100,9 +100,6 @@ export function createApp({ database = pool, sessionOptions = {} } = {}) {
   let assistantRequests = 0;
   app.post('/api/assistant',handler(async(req,res)=>{
     const question = mustText(req.body?.question, 'question', 600);
-    const key = process.env.GEMINI_API_KEY?.trim();
-    if (!key) throw new HttpError(503, 'NexAI is not configured yet. Ask the site owner to connect Gemini.');
-
     const now = Date.now();
     if (now - assistantWindowStart >= 60_000) {
       assistantWindowStart = now;
@@ -111,7 +108,7 @@ export function createApp({ database = pool, sessionOptions = {} } = {}) {
     if (assistantRequests >= 12) throw new HttpError(429, 'NexAI is busy. Please try again in a minute.');
     assistantRequests++;
     const events = await publishedEvents();
-    res.json(await answerEventQuestion(question, events, key));
+    res.json(answerEventQuestion(question, events));
   }));
   app.get('/api/events/:id',handler(async(req,res)=>{
     const [[e]]=await pool.query('SELECT * FROM events WHERE id=?',[mustInt(req.params.id)]);
