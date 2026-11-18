@@ -4,9 +4,19 @@ import { Cart, Notification } from './models.js';
 import { HttpError, mustInt, normalizeItems } from './util.js';
 import { recordBookingActivity } from './activity-log.js';
 
-export async function createBooking(userId, rawItems) {
+// MongoDB reports a duplicate unique key (dedupeKey) with code 11000. When two
+// syncs of the same booking run at once (checkout + retryPending) the loser of
+// the upsert race gets that error, but the record already exists, so it is not
+// a real failure and must not flip sync_status to 'error'.
+const isDuplicateKey = err => err?.code === 11000;
+async function ignoreDuplicate(write) {
+  try { await write(); } catch (err) { if (!isDuplicateKey(err)) throw err; }
+}
+
+// `db` defaults to the shared MySQL pool; tests pass a fake pool instead.
+export async function createBooking(userId, rawItems, db = pool) {
   const items = normalizeItems(rawItems);
-  const conn = await pool.getConnection();
+  const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
     // Sorted locks reduce deadlock risk when two carts share ticket types.
@@ -38,8 +48,8 @@ export async function createBooking(userId, rawItems) {
   finally { conn.release(); }
 }
 
-export async function cancelBooking(bookingId, userId=null) {
-  const conn = await pool.getConnection();
+export async function cancelBooking(bookingId, userId=null, db = pool) {
+  const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
     const [[booking]] = await conn.query('SELECT * FROM bookings WHERE id=? FOR UPDATE',[mustInt(bookingId)]);
@@ -47,7 +57,10 @@ export async function cancelBooking(bookingId, userId=null) {
     if (userId !== null && booking.user_id !== userId) throw new HttpError(403,'Not your booking');
     if (booking.status !== 'confirmed') throw new HttpError(409,'Booking is already cancelled');
     const [items] = await conn.query('SELECT * FROM booking_items WHERE booking_id=? ORDER BY ticket_type_id FOR UPDATE',[booking.id]);
-    for (const i of items) await conn.query('UPDATE ticket_types SET available=available+? WHERE id=?',[i.quantity,i.ticket_type_id]);
+    // LEAST(capacity, ...) keeps stock within the table's CHECK (available <= capacity).
+    // Without it, an admin who lowered capacity after the sale would make the
+    // cancellation fail with a constraint error and leave the booking stuck.
+    for (const i of items) await conn.query('UPDATE ticket_types SET available=LEAST(capacity, available+?) WHERE id=?',[i.quantity,i.ticket_type_id]);
     await conn.query("UPDATE bookings SET status='cancelled', sync_status='pending' WHERE id=?",[booking.id]);
     await conn.commit();
     return { ...booking, status:'cancelled', sync_status:'pending' };
@@ -57,35 +70,37 @@ export async function cancelBooking(bookingId, userId=null) {
 
 // Durable retry source lives in SQL bookings.sync_status. Cross-DB writes are
 // idempotent and eventually consistent, not a distributed ACID transaction.
-export async function syncBooking(bookingId) {
-  const [[b]] = await pool.query(
+export async function syncBooking(bookingId, db = pool) {
+  const [[b]] = await db.query(
     'SELECT *, UNIX_TIMESTAMP(created_at) AS created_at_unix FROM bookings WHERE id=?',
     [mustInt(bookingId)]
   );
   if (!b) return;
   try {
-    const [items] = await pool.query('SELECT ticket_type_id FROM booking_items WHERE booking_id=?',[b.id]);
+    const [items] = await db.query('SELECT ticket_type_id FROM booking_items WHERE booking_id=?',[b.id]);
     if (b.status === 'confirmed') {
       const ids = items.map(i => i.ticket_type_id);
       await Cart.updateOne({userId:b.user_id}, {$pull:{items:{ticketTypeId:{$in:ids}}}});
     }
     const cancelled = b.status === 'cancelled';
-    await recordBookingActivity(b, 'booking_confirmed', {
+    // A booking that was cancelled before its first sync still gets its
+    // "confirmed" entry, so the log shows the whole lifecycle in order.
+    await ignoreDuplicate(() => recordBookingActivity(b, 'booking_confirmed', {
       timestamp: new Date(Number(b.created_at_unix) * 1000)
-    });
+    }));
 
     if (cancelled) {
-      await recordBookingActivity(b, 'booking_cancelled');
+      await ignoreDuplicate(() => recordBookingActivity(b, 'booking_cancelled'));
     }
-    await Notification.updateOne({dedupeKey:`booking-${b.id}-${b.status}`}, {
+    await ignoreDuplicate(() => Notification.updateOne({dedupeKey:`booking-${b.id}-${b.status}`}, {
       $setOnInsert: { userId:b.user_id, type:'booking', isRead:false,
         title:cancelled?'Booking cancelled':'Booking confirmed',
         message:cancelled?`${b.booking_code} was cancelled and stock restored.`:`${b.booking_code} is confirmed. Your tickets are ready.`,
         dedupeKey:`booking-${b.id}-${b.status}` }
-    }, {upsert:true});
-    await pool.query("UPDATE bookings SET sync_status='done' WHERE id=? AND status=?",[b.id,b.status]);
+    }, {upsert:true}));
+    await db.query("UPDATE bookings SET sync_status='done' WHERE id=? AND status=?",[b.id,b.status]);
   } catch (error) {
-    await pool.query("UPDATE bookings SET sync_status='error' WHERE id=? AND status=?",[b.id,b.status]);
+    await db.query("UPDATE bookings SET sync_status='error' WHERE id=? AND status=?",[b.id,b.status]);
     throw error;
   }
 }
@@ -116,9 +131,9 @@ export async function demonstrateRollback(userId) {
   return {...example,after:t.available,booking_rows_remaining:b.count,rolled_back:t.available===example.before && b.count===0};
 }
 
-export async function retryPending() {
-  const [pending] = await pool.query("SELECT id FROM bookings WHERE sync_status IN ('pending','error') ORDER BY id LIMIT 30");
+export async function retryPending(db = pool) {
+  const [pending] = await db.query("SELECT id FROM bookings WHERE sync_status IN ('pending','error') ORDER BY id LIMIT 30");
   for (const b of pending) {
-    try { await syncBooking(b.id); } catch (err) { console.warn('Sync pending', b.id, err.message); }
+    try { await syncBooking(b.id, db); } catch (err) { console.warn('Sync pending', b.id, err.message); }
   }
 }
