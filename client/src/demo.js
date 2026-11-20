@@ -1,13 +1,13 @@
 const ms=24*60*60*1000;
 const titles=[
-  ['LUNAR SOUND FEST','Music','Impact Arena','lunar.svg',590],
-  ['PIXEL ARENA 2027','Esports','True Digital Park','pixel.svg',590],
-  ['ART AFTER HOURS','Arts','River City Bangkok','art.svg',490],
-  ['DREAMSCAPE LIVE','Music','Union Hall','dream.svg',590],
-  ['CREATE & CONNECT','Workshop','Samyan Mitrtown','create.svg',290],
-  ['MIDNIGHT BLOOM','Lifestyle','Warehouse 30','bloom.svg',490],
-  ['FUTURE FORUM','Conference','Queen Sirikit NCC','future.svg',490],
-  ['CINEMA UNDER STARS','Lifestyle','Benjakitti Park','cinema.svg',350]
+  ['LUNAR SOUND FEST','Music','Impact Arena','lunar-photo.jpg',590],
+  ['PIXEL ARENA 2027','Esports','True Digital Park','pixel-photo.jpg',590],
+  ['ART AFTER HOURS','Arts','River City Bangkok','art-photo.jpg',490],
+  ['DREAMSCAPE LIVE','Music','Union Hall','dream-photo.jpg',590],
+  ['CREATE & CONNECT','Workshop','Samyan Mitrtown','create-photo.jpg',290],
+  ['MIDNIGHT BLOOM','Lifestyle','Warehouse 30','bloom-photo.jpg',490],
+  ['FUTURE FORUM','Conference','Queen Sirikit NCC','future-photo.jpg',490],
+  ['CINEMA UNDER STARS','Lifestyle','Benjakitti Park','cinema-photo.jpg',350]
 ];
 export const demoEvents=titles.map(([title,category,venue,poster,price],i)=>({
   id:i+1,title,category,venue,city:'Bangkok',

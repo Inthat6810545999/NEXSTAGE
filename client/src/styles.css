@@ -180,3 +180,7 @@ html[data-theme="dark"] .buyer-booking-notice button{background:#243f32;color:#d
   .qty-and-total{gap:14px}
 }
 @media(prefers-reduced-motion:reduce){.buyer-spinner{animation:none}}
+.footer-links a{color:#95899d;font-size:11px;text-decoration:none}
+.footer-links a:hover{color:#7440c2;text-decoration:underline}
+html[data-theme="dark"] .footer-links a{color:#c8bfd2}
+html[data-theme="dark"] .footer-links a:hover{color:#e1d6ec}
