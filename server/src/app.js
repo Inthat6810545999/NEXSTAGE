@@ -56,6 +56,13 @@ export function createApp({ database = pool, sessionOptions = {} } = {}) {
     const [[u]]=await pool.query('SELECT id,display_name,email,role FROM users WHERE id=?',[id]);
     return u||null;
   }
+  async function withReviewAuthors(reviews) {
+    const userIds=[...new Set(reviews.map(review=>review.userId))];
+    if(!userIds.length) return reviews;
+    const [users]=await pool.query('SELECT id,display_name FROM users WHERE id IN (?)',[userIds]);
+    const names=new Map(users.map(user=>[Number(user.id),user.display_name]));
+    return reviews.map(review=>({...review,authorName:names.get(Number(review.userId))||'Former member'}));
+  }
   app.get('/api/me',handler(async (req,res)=>{
     res.json({user:await sessionUser(req)});
   }));
@@ -115,7 +122,7 @@ export function createApp({ database = pool, sessionOptions = {} } = {}) {
     if(!e || e.status!=='published') throw new HttpError(404,'Event not found');
     const [tickets]=await pool.query('SELECT * FROM ticket_types WHERE event_id=? ORDER BY price',[e.id]);
     const reviews=await Review.find({eventId:e.id}).sort({createdAt:-1}).limit(20).lean();
-    res.json({event:{...e,audience_groups:parseEventTags(e.audience_groups,['everyone']),benefits:parseEventTags(e.benefits,[]),tickets},reviews});
+    res.json({event:{...e,audience_groups:parseEventTags(e.audience_groups,['everyone']),benefits:parseEventTags(e.benefits,[]),tickets},reviews:await withReviewAuthors(reviews)});
   }));
   app.get('/api/stats',handler(async(_req,res)=>{
     const [[e]]=await pool.query("SELECT COUNT(*) AS count FROM events WHERE status='published'");
@@ -183,7 +190,7 @@ export function createApp({ database = pool, sessionOptions = {} } = {}) {
   app.get('/api/reviews',handler(async(req,res)=>{
     const eventId=req.query.eventId?mustInt(req.query.eventId,'event'):null;
     const reviews=await Review.find(eventId?{eventId}:{}).sort({createdAt:-1}).limit(100).lean();
-    res.json({reviews});
+    res.json({reviews:await withReviewAuthors(reviews)});
   }));
   app.post('/api/reviews',requireAuth,handler(async(req,res)=>{
     const eventId=mustInt(req.body.eventId,'event');
@@ -192,7 +199,22 @@ export function createApp({ database = pool, sessionOptions = {} } = {}) {
     const text=mustText(req.body.text,'review',1500);
     const [[e]]=await pool.query('SELECT id FROM events WHERE id=?',[eventId]);
     if(!e) throw new HttpError(404,'Event not found');
-    const review=await Review.findOneAndUpdate({userId:req.user.id,eventId},{$set:{rating,text}},{new:true,upsert:true,runValidators:true});
+    const existing=await Review.exists({userId:req.user.id,eventId});
+    if(existing) throw new HttpError(409,'You already reviewed this event. Edit your review instead.');
+    try {
+      const review=await Review.create({userId:req.user.id,eventId,rating,text});
+      res.status(201).json({review});
+    } catch(error) {
+      if(error.code===11000) throw new HttpError(409,'You already reviewed this event. Edit your review instead.');
+      throw error;
+    }
+  }));
+  app.patch('/api/reviews/:id',requireAuth,handler(async(req,res)=>{
+    const rating=mustInt(req.body.rating,'rating');
+    if(rating>5) throw new HttpError(400,'Rating must be 1–5');
+    const text=mustText(req.body.text,'review',1500);
+    const review=await Review.findOneAndUpdate({_id:req.params.id,userId:req.user.id},{$set:{rating,text}},{new:true,runValidators:true});
+    if(!review) throw new HttpError(404,'Review not found');
     res.json({review});
   }));
   app.delete('/api/reviews/:id',requireAuth,handler(async(req,res)=>{

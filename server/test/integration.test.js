@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { createApp } from '../src/app.js';
 import { connectMongo, pool } from '../src/config.js';
-import { Cart, Notification, UserActivityLog } from '../src/models.js';
+import { Cart, Notification, Review, UserActivityLog } from '../src/models.js';
 
 test('event discovery → cart → booking → cancellation → Admin Activity Log', {
   skip: process.env.RUN_INTEGRATION_TESTS !== '1'
@@ -51,6 +51,7 @@ test('event discovery → cart → booking → cancellation → Admin Activity L
       await Promise.all([
         Cart.deleteMany({ userId }),
         Notification.deleteMany({ userId }),
+        Review.deleteMany({ userId }),
         UserActivityLog.deleteMany({ userId })
       ]);
     }
@@ -105,6 +106,27 @@ test('event discovery → cart → booking → cancellation → Admin Activity L
   userId = registration.payload.user.id;
   const userCookie = registration.response.headers.get('set-cookie').match(/nexstage_session=[^;,]+/)[0];
   const adminCookie = await login(adminEmail);
+
+  const firstReview = await request('/api/reviews', {
+    method: 'POST', cookie: userCookie,
+    body: { eventId, rating: 4, text: 'Great event' }
+  });
+  assert.equal(firstReview.response.status, 201);
+  const reviewId = firstReview.payload.review._id;
+  const duplicateReview = await request('/api/reviews', {
+    method: 'POST', cookie: userCookie,
+    body: { eventId, rating: 1, text: 'This must not replace my review' }
+  });
+  assert.equal(duplicateReview.response.status, 409);
+  const editedReview = await request(`/api/reviews/${reviewId}`, {
+    method: 'PATCH', cookie: userCookie,
+    body: { rating: 5, text: 'Updated review' }
+  });
+  assert.equal(editedReview.response.status, 200);
+  assert.equal(editedReview.payload.review.text, 'Updated review');
+  assert.equal((await Review.findById(reviewId)).rating, 5);
+  const visibleReviews = await request(`/api/reviews?eventId=${eventId}`);
+  assert.equal(visibleReviews.payload.reviews.find(review=>review._id===reviewId).authorName, 'Integration User');
 
   const cartResult = await request('/api/cart', { cookie: userCookie });
   assert.equal(cartResult.response.status, 200);

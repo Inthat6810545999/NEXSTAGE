@@ -109,6 +109,7 @@ function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed,cartItem
   const [rating,setRating] = useState(5);
   const [review,setReview] = useState('');
   const [reviews,setReviews] = useState([]);
+  const [editingReview,setEditingReview] = useState(false);
   const [busy,setBusy] = useState(false);
   const [adding,setAdding] = useState(false);
   const [addError,setAddError] = useState('');
@@ -125,6 +126,7 @@ function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed,cartItem
     setVenueMode(mode);
   }
   useEffect(()=>{api(`/reviews?eventId=${event.id}`).then(r=>setReviews(r.reviews)).catch(()=>{});},[event.id]);
+  const ownReview=reviews.find(r=>Number(r.userId)===Number(user?.id));
 
   const ticket = tickets.find(t=>String(t.id)===String(choice)) || tickets[0];
   const available = Math.max(0,Number(ticket?.available)||0);
@@ -146,7 +148,7 @@ function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed,cartItem
       setAdding(false);
     }
   }
-  async function submitReview(e){e.preventDefault();if(!user)return onLogin();setBusy(true);try{await api('/reviews',{method:'POST',body:{eventId:event.id,rating,text:review}});setReview('');onReviewed?.();const r=await api(`/reviews?eventId=${event.id}`);setReviews(r.reviews);notify('Review published');}catch(err){notify(err.message,'error');}finally{setBusy(false);}}
+  async function submitReview(e){e.preventDefault();if(!user)return onLogin();if(ownReview&&!editingReview)return;setBusy(true);try{await api(editingReview?`/reviews/${ownReview._id}`:'/reviews',{method:editingReview?'PATCH':'POST',body:{eventId:event.id,rating,text:review}});setReview('');setEditingReview(false);onReviewed?.();const r=await api(`/reviews?eventId=${event.id}`);setReviews(r.reviews);notify(editingReview?'Review updated':'Review published');}catch(err){notify(err.message,'error');}finally{setBusy(false);}}
 
   if(venueMode) return <Modal wide onClose={onClose} label={event.title + ' venue preview'}>
     <VenuePreview event={event} mode={venueMode} onMode={setVenueMode} onBack={()=>setVenueMode(null)} />
@@ -158,12 +160,13 @@ function EventModal({event,onClose,onAdd,notify,user,onLogin,onReviewed,cartItem
         <img className="detail-poster" src={event.poster_path} alt={`${event.title} poster`}/>
         <div className="detail-reviews">
           <div className="section-row"><h3>Community reviews</h3><Pill>{reviews.length} reviews</Pill></div>
-          {reviews.length ? reviews.slice(0,3).map(r=><div className="review-item" key={r._id}><span className="review-stars">{'★'.repeat(r.rating)}</span><p>{r.text}</p></div>) : <p className="muted">Be the first to review this event.</p>}
-          <form onSubmit={submitReview} className="review-form">
+          {reviews.length ? [...new Map([...(ownReview?[ownReview]:[]),...reviews].map(r=>[r._id,r])).values()].slice(0,3).map(r=><div className="review-item" key={r._id}><strong className="review-author">{r.authorName||'Community member'}</strong><span className="review-stars">{'★'.repeat(r.rating)}</span><p>{r.text}</p>{Number(r.userId)===Number(user?.id)&&<button type="button" className="review-edit" onClick={()=>{setRating(r.rating);setReview(r.text);setEditingReview(true);}} disabled={busy}><Pencil size={13}/> Edit review</button>}</div>) : <p className="muted">Be the first to review this event.</p>}
+          {(!ownReview||editingReview)&&<form onSubmit={submitReview} className="review-form">
             <div className="rating-select">{[1,2,3,4,5].map(i=><button type="button" key={i} className={i<=rating?'star-on':'star-off'} onClick={()=>setRating(i)} aria-label={`Rate ${i} stars`}>★</button>)}</div>
-            <input required maxLength={1500} placeholder="Share your thoughts…" value={review} onChange={e=>setReview(e.target.value)}/>
-            <button type="submit" className="mini-submit" disabled={busy} aria-label="Post review"><Send size={17}/></button>
-          </form>
+            <input required maxLength={1500} placeholder={editingReview?'Edit your review…':'Share your thoughts…'} value={review} onChange={e=>setReview(e.target.value)}/>
+            {editingReview&&<button type="button" className="review-cancel" onClick={()=>{setEditingReview(false);setReview('');}}>Cancel</button>}
+            <button type="submit" className="mini-submit" disabled={busy} aria-label={editingReview?'Save review':'Post review'}><Send size={17}/></button>
+          </form>}
         </div>
       </div>
       <div className="detail-right">

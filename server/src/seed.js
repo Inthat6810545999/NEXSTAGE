@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import { pool, connectMongo } from './config.js';
 import { Cart, Review, Wishlist, Notification } from './models.js';
 
+const concertDay=()=>35+Math.floor(Math.random()*145);
+
 const events=[
   ['LUNAR SOUND FEST','Music','Impact Arena','Bangkok','An unforgettable night of electronic sounds, light installations, and your favorite rising artists.','lunar.svg',22,17],
   ['PIXEL ARENA 2027','Esports','True Digital Park','Bangkok','The next generation of competitive gaming. Cheer for your team, meet creators, and experience the final.','pixel.svg',33,13],
@@ -14,8 +16,34 @@ const events=[
   ['PORTFOLIO FUTURE CAMP','Portfolio Camp','Kasetsart University','Bangkok','Hands-on camp for students: explore creative projects and build a stronger university portfolio.','create.svg',109,9],
   ['VOLUNTEER IMPACT DAY','Volunteer','Community Learning Center','Bangkok','A community service day for students and adults. Learn by helping, meet your neighbors, and make a difference.','art.svg',113,9],
   ['CAREER CERTIFICATE STUDIO','Certificate Course','Innovation Hub','Bangkok','A weekend practical course for professionals and lifelong learners, with a demo participation certificate.','future.svg',120,10],
-  ['MINDFUL RETREAT','Dharma & Wellness','Peaceful Meditation Center','Bangkok','A gentle guided meditation retreat open to older adults and anyone seeking mindfulness and reflection.','bloom.svg',129,8]
+  ['MINDFUL RETREAT','Dharma & Wellness','Peaceful Meditation Center','Bangkok','A gentle guided meditation retreat open to older adults and anyone seeking mindfulness and reflection.','bloom.svg',129,8],
+  ['QUEEN II NIGHT','Music','Union Hall','Bangkok','A fictional Queen-inspired concert demo featuring an album-style cover.','queen-ii.jpg',concertDay(),19],
+  ['XXXTENTACION LIVE','Music','True Digital Park','Bangkok','A fictional XXXTentacion-inspired concert demo featuring a portrait.','xxxtentacion.jpg',concertDay(),19],
+  ['SEK LOSO LIVE','Music','Impact Arena','Bangkok','A fictional SEK LOSO-inspired concert demo featuring a performance image.','sek-loso.jpg',concertDay(),19],
+  ['DANIEL CAESAR LIVE','Music','Impact Arena','Bangkok','A fictional Daniel Caesar-inspired concert demo. The poster displays June 9, so this event uses that date.','daniel-caesar.jpg',concertDay(),19,'2027-06-09 19:00:00'],
+  ['TAYLOR SWIFT 1989 NIGHT','Music','Union Hall','Bangkok','A fictional Taylor Swift-inspired concert demo featuring a 1989-style cover.','taylor-swift.jpg',concertDay(),19],
+  ['YOUNGOHM LIVE','Music','Warehouse 30','Bangkok','A fictional YOUNGOHM-inspired concert demo featuring an album-style cover.','pink-suit.jpg',concertDay(),19],
+  ['OLIVIA RODRIGO LIVE','Music','Union Hall','Bangkok','A fictional Olivia Rodrigo-inspired concert demo featuring an album-style cover.','swing.jpg',concertDay(),19],
+  ['BTS NIGHT','Music','Impact Arena','Bangkok','A fictional BTS-inspired concert demo featuring a group portrait.','bts.png',concertDay(),19],
+  ['MICHAEL JACKSON THRILLER','Music','Impact Arena','Bangkok','A fictional Michael Jackson-inspired concert demo featuring a Thriller-style cover.','michael-jackson.png',concertDay(),19],
+  ['KANYE WEST LIVE','Music','Union Hall','Bangkok','A fictional Kanye West-inspired concert demo featuring a portrait.','kanye-west.png',concertDay(),19],
+  ['BILLIE EILISH HAPPIER THAN EVER','Music','Union Hall','Bangkok','A fictional Billie Eilish-inspired concert demo featuring a Happier Than Ever-style cover.','billie-eilish.jpg',concertDay(),19],
+  ['OASIS LIVE 67','Music','Impact Arena','Bangkok','A fictional Oasis-inspired concert demo featuring a black-and-white live cover.','oasis.jpg',concertDay(),19],
+  ['THE BEATLES LET IT BE','Music','Union Hall','Bangkok','A fictional Beatles-inspired concert demo featuring a Let It Be-style cover.','the-beatles.jpg',concertDay(),19],
+  ['BRUNO MARS 24K MAGIC','Music','Impact Arena','Bangkok','A fictional Bruno Mars-inspired concert demo featuring a 24K Magic-style cover.','bruno-mars.jpg',concertDay(),19]
 ];
+const previousConcertTitles=new Map([
+  ['QUEEN II NIGHT','QUEEN II PARODY NIGHT'],
+  ['XXXTENTACION LIVE','XXXTENTACION PARODY LIVE'],
+  ['SEK LOSO LIVE',['FREDDIE MERCURY SHOW','FREDDIE MERCURY PARODY SHOW']],
+  ['DANIEL CAESAR LIVE','DANIEL CAESAR PARODY LIVE'],
+  ['TAYLOR SWIFT 1989 NIGHT','TAYLOR SWIFT 1989 PARODY NIGHT'],
+  ['YOUNGOHM LIVE','YOUNGOHM PARODY LIVE'],
+  ['OLIVIA RODRIGO LIVE','OLIVIA RODRIGO PARODY LIVE'],
+  ['BTS NIGHT','BTS PARODY NIGHT'],
+  ['MICHAEL JACKSON THRILLER','MICHAEL JACKSON THRILLER PARODY'],
+  ['KANYE WEST LIVE','KANYE WEST PARODY LIVE']
+]);
 const dateAt=(days,hour)=>{
  const date=new Date(Date.now()+days*86400000);
  date.setHours(hour,0,0,0);
@@ -40,12 +68,21 @@ try {
     'CAREER CERTIFICATE STUDIO':{audiences:['university','working','senior'],benefits:['certificate']},
     'MINDFUL RETREAT':{audiences:['senior','working'],benefits:['wellness']}
   };
-  for (const [title,category,venue,city,description,poster,days,hour] of events) {
-    const [existing]=await pool.query('SELECT id FROM events WHERE title=?',[title]);
+  for (const [title,category,venue,city,description,poster,days,hour,fixedStart] of events) {
+    const oldTitles=previousConcertTitles.get(title);
+    const previousTitles=Array.isArray(oldTitles)?oldTitles:oldTitles?[oldTitles]:[];
+    const titles=[title,...previousTitles];
+    const [existing]=await pool.query(`SELECT id,title FROM events WHERE title IN (${titles.map(()=>'?').join(',')}) ORDER BY title=? DESC LIMIT 1`,[...titles,title]);
     let eventId=existing[0]?.id;
+    if(eventId && previousTitles.includes(existing[0].title)) {
+      await pool.query('UPDATE events SET title=?,description=?,poster_path=? WHERE id=?',
+        [title,description,`/posters/${poster}`,eventId]);
+    }
     if(!eventId) {
+      const startAt=fixedStart||dateAt(days,hour);
+      const endAt=fixedStart?'2027-06-09 23:00:00':dateAt(days,hour+4);
       const [r]=await pool.query(`INSERT INTO events (organizer_id,title,category,venue,city,description,start_at,end_at,poster_path,status)
-        VALUES (?,?,?,?,?,?,?,?,?,'published')`,[admin.id,title,category,venue,city,description,dateAt(days,hour),dateAt(days,hour+4),`/posters/${poster}`]);
+        VALUES (?,?,?,?,?,?,?,?,?,'published')`,[admin.id,title,category,venue,city,description,startAt,endAt,`/posters/${poster}`]);
       eventId=r.insertId;
     }
     const audience=metadata[title]||{audiences:['everyone'],benefits:['entertainment']};
@@ -65,7 +102,7 @@ try {
   await Wishlist.updateOne({userId:student.id},{$setOnInsert:{eventIds:eventIds.slice(0,2).map(e=>e.id)}},{upsert:true});
   await Notification.updateOne({dedupeKey:'welcome-demo'},{$setOnInsert:{userId:student.id,title:'Welcome to NEXSTAGE!',message:'Explore upcoming events and book your next experience.',type:'system',isRead:false,dedupeKey:'welcome-demo'}},{upsert:true});
   if(eventIds.length) await Review.updateOne({userId:student.id,eventId:eventIds[0].id},{$setOnInsert:{rating:5,text:'The lineup looks amazing! Cannot wait for this event.'}},{upsert:true});
-  console.log('Seed complete: 12 demo events (plus existing custom events), ticket types, 2 users and Mongo demo documents.');
+  console.log('Seed complete: 26 demo events (plus existing custom events), ticket types, 2 users and Mongo demo documents.');
   console.log('Admin: admin@nexstage.local / Demo12345!');
   console.log('Student: student@nexstage.local / Demo12345!');
 } catch(error) { console.error(error); process.exitCode=1; }
