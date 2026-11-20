@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
 import { pool, connectMongo } from './config.js';
 import { Cart, Review, Wishlist, Notification } from './models.js';
 
@@ -56,6 +57,63 @@ const previousConcertTitles=new Map([
   ['LET IT BE SESSIONS: THE BEATLES','THE BEATLES LET IT BE'],
   ['24K MAGIC PARTY WITH BRUNO MARS','BRUNO MARS 24K MAGIC']
 ]);
+const reviewHighlights={
+  'LUNAR SOUND FEST':'The music and light theme sounds like a fun way to spend an evening with friends.',
+  'PIXEL ARENA 2027':'I like that there is a chance to cheer for teams and meet creators in one place.',
+  'ART AFTER HOURS':'The late gallery format sounds relaxed, and the installations look interesting.',
+  'DREAMSCAPE LIVE':'A smaller live show with dreamy lighting is exactly my kind of concert.',
+  'CREATE & CONNECT':'The mix of hands-on sessions and meeting other makers is appealing.',
+  'MIDNIGHT BLOOM':'Flowers, small shops and food in an evening setting sound lovely.',
+  'FUTURE FORUM':'The design and entrepreneurship topics make this one worth checking out.',
+  'CINEMA UNDER STARS':'An outdoor film night with friends sounds like such a nice plan.',
+  'PORTFOLIO FUTURE CAMP':'I like the practical focus on building a portfolio instead of just listening to talks.',
+  'VOLUNTEER IMPACT DAY':'A good chance to meet people while doing something useful for the community.',
+  'CAREER CERTIFICATE STUDIO':'The weekend schedule and practical activities make this easy to consider.',
+  'MINDFUL RETREAT':'The gentle pace sounds welcoming for someone new to meditation.',
+  'QUEEN: A NIGHT AT THE OPERA':'The Queen-inspired theme makes the concert feel like a big night out.',
+  'MOONLIGHT SESSIONS WITH XXXTENTACION':'The mood of this music night looks distinctive and intimate.',
+  'SEK LOSO ROCK LEGEND':'A rock-focused evening at Impact Arena sounds exciting.',
+  'DANIEL CAESAR: FREUDIAN EVENING':'The soulful theme would be great for a slower evening of live music.',
+  '1989 CITY LIGHTS: TAYLOR SWIFT':'The city-lights concept and 1989-inspired music look like a fun combination.',
+  'YOUNGOHM: BANGKOK AFTER DARK':'The Bangkok after-dark theme gives this event a lot of personality.',
+  'OLIVIA RODRIGO: SOUR TO GUTS':'This looks like the kind of sing-along night to bring friends to.',
+  'BTS PURPLE UNIVERSE':'The purple theme makes this feel like a welcoming fan gathering.',
+  'THRILLER NIGHT WITH MICHAEL JACKSON':'The Thriller-inspired concept sounds full of energy.',
+  'KANYE WEST: GRADUATION NIGHTS':'I like the bold Graduation-inspired look of this music night.',
+  'HAPPIER THAN EVER WITH BILLIE EILISH':'The softer mood of this concept really stands out.',
+  'OASIS LIVE 67: BACK TO THE STAGE':'A guitar-heavy sing-along night sounds like a good time.',
+  'LET IT BE SESSIONS: THE BEATLES':'The classic song theme feels easy to enjoy with a mixed group of friends.',
+  '24K MAGIC PARTY WITH BRUNO MARS':'This looks like a lively night for dancing with friends.'
+};
+const reviewByCategory={
+  Music:['The concept caught my eye right away; I would love to hear the set live.','Looks like a good evening plan, especially with friends who love live music.','The visuals and music theme seem to fit together really well.'],
+  Esports:['The stage setup looks exciting, and the event sounds easy to enjoy as a spectator.'],
+  Arts:['I appreciate that there is more to explore than a single exhibition.'],
+  Workshop:['This seems approachable even if you are coming on your own.'],
+  Lifestyle:['The atmosphere sounds inviting and a little different from the usual weekend plan.'],
+  Conference:['The topics seem relevant without feeling too broad.'],
+  'Portfolio Camp':['The hands-on part would be useful for students preparing applications.'],
+  Volunteer:['I like that the activity is open to people at different stages of life.'],
+  'Certificate Course':['It sounds like a manageable way to learn something practical.'],
+  'Dharma & Wellness':['The calm setting and guided format make it feel approachable.']
+};
+const sampleReviewerNames=['Mali','Niran','Ploy','Tan','Fern','Krit','Mint','Bank','May','Pete'];
+const sampleReviewCount=index=>5+(index*7)%6;
+const reviewTexts=(event,index)=>{
+  const categoryNotes=reviewByCategory[event.category]||reviewByCategory.Lifestyle;
+  return [
+    reviewHighlights[event.title],
+    categoryNotes[index%categoryNotes.length],
+    `The idea behind ${event.title} caught my attention. I would like to see how it comes together.`,
+    `The poster made me stop and read about ${event.title}. The plan sounds promising.`,
+    `I like the choice of ${event.venue} for this kind of event.`,
+    `This is one I would consider going to with a friend. The description sounds inviting.`,
+    `The details are clear enough to help me decide whether to make time for it.`,
+    `I have been looking for something like this in Bangkok. It looks worth checking out.`,
+    `The theme feels thoughtfully put together, and the venue is easy to recognize.`,
+    `I saved ${event.title} to compare with my other weekend plans.`
+  ];
+};
 const dateAt=(days,hour)=>{
  const date=new Date(Date.now()+days*86400000);
  date.setHours(hour,0,0,0);
@@ -74,6 +132,22 @@ try {
   }
   const [[admin]]=await pool.query('SELECT id FROM users WHERE email=?',['admin@nexstage.local']);
   const [[student]]=await pool.query('SELECT id FROM users WHERE email=?',['student@nexstage.local']);
+  const sampleReviewers=[];
+  for (const [index,firstName] of sampleReviewerNames.entries()) {
+    const name=firstName;
+    const email=`sample-reviewer-${index+1}@nexstage.local`;
+    const [found]=await pool.query('SELECT id FROM users WHERE email=?',[email]);
+    if(found.length) {
+      sampleReviewers.push(found[0].id);
+      await pool.query('UPDATE users SET display_name=? WHERE id=?',[name,found[0].id]);
+    }
+    else {
+      const [result]=await pool.query('INSERT INTO users (display_name,email,password_hash,role) VALUES (?,?,?,?)',
+        [name,email,await bcrypt.hash(randomBytes(24).toString('hex'),10),'customer']);
+      sampleReviewers.push(result.insertId);
+    }
+  }
+  const seededEvents=[];
   const metadata={
     'PORTFOLIO FUTURE CAMP':{audiences:['student','university'],benefits:['portfolio','networking']},
     'VOLUNTEER IMPACT DAY':{audiences:['student','university','working','senior'],benefits:['volunteer','networking']},
@@ -100,6 +174,7 @@ try {
         VALUES (?,?,?,?,?,?,?,?,?,'published')`,[admin.id,title,category,venue,city,description,startAt,endAt,`/posters/${poster}`]);
       eventId=r.insertId;
     }
+    seededEvents.push({id:eventId,title,category,venue});
     const audience=metadata[title]||{audiences:['everyone'],benefits:['entertainment']};
     // Update only classification tags; don't change custom event names, prices or schedules.
     await pool.query('UPDATE events SET audience_groups=?, benefits=? WHERE id=?',
@@ -111,13 +186,21 @@ try {
       await pool.query('INSERT INTO ticket_types (event_id,label,price,capacity,available) VALUES (?,?,?,?,?)',[eventId,'VIP',base+900,40,40]);
     }
   }
+  for (const [index,event] of seededEvents.entries()) {
+    const notes=reviewTexts(event,index);
+    for (const [reviewerIndex,userId] of sampleReviewers.slice(0,sampleReviewCount(index)).entries()) {
+      await Review.updateOne({userId,eventId:event.id},
+        {$setOnInsert:{rating:(index+reviewerIndex)%4===0?4:5,text:notes[reviewerIndex],isDemo:true}},
+        {upsert:true});
+    }
+  }
   const [tickets]=await pool.query('SELECT id FROM ticket_types ORDER BY id LIMIT 1');
   const [eventIds]=await pool.query('SELECT id FROM events ORDER BY id LIMIT 3');
   if(tickets.length) await Cart.updateOne({userId:student.id},{$setOnInsert:{items:[{ticketTypeId:tickets[0].id,quantity:2}]}},{upsert:true});
   await Wishlist.updateOne({userId:student.id},{$setOnInsert:{eventIds:eventIds.slice(0,2).map(e=>e.id)}},{upsert:true});
   await Notification.updateOne({dedupeKey:'welcome-demo'},{$setOnInsert:{userId:student.id,title:'Welcome to NEXSTAGE!',message:'Explore upcoming events and book your next experience.',type:'system',isRead:false,dedupeKey:'welcome-demo'}},{upsert:true});
   if(eventIds.length) await Review.updateOne({userId:student.id,eventId:eventIds[0].id},{$setOnInsert:{rating:5,text:'The lineup looks amazing! Cannot wait for this event.'}},{upsert:true});
-  console.log('Seed complete: 26 demo events (plus existing custom events), ticket types, 2 users and Mongo demo documents.');
+  console.log('Seed complete: 26 demo events (plus existing custom events), ticket types, 12 users and Mongo sample reviews.');
   console.log('Admin: admin@nexstage.local / Demo12345!');
   console.log('Student: student@nexstage.local / Demo12345!');
 } catch(error) { console.error(error); process.exitCode=1; }

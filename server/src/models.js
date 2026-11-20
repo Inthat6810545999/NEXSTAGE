@@ -11,7 +11,8 @@ const reviewSchema = new Schema({
   userId: { type: Number, required: true, min: 1 },
   eventId: { type: Number, required: true, min: 1 },
   rating: { type: Number, required: true, min: 1, max: 5 },
-  text: { type: String, required: true, maxlength: 1500, trim: true }
+  text: { type: String, required: true, maxlength: 1500, trim: true },
+  isDemo: { type: Boolean, default: false }
 }, opts);
 reviewSchema.index({ userId: 1, eventId: 1 }, { unique: true });
 
