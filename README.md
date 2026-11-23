@@ -10,6 +10,7 @@ This is a development and demonstration project. Checkout does not charge money,
 
 ## Contents
 
+- [Team members](#team-members)
 - [Final Project Presentation & Live Demo](#final-project-presentation--live-demo)
 - [Features](#features)
 - [Technology stack](#technology-stack)
@@ -26,6 +27,17 @@ This is a development and demonstration project. Checkout does not charge money,
 - [Troubleshooting](#troubleshooting)
 - [Known limitations](#known-limitations)
 - [Supporting documentation](#supporting-documentation)
+
+## Team members
+
+| Name | Student ID |
+| --- | --- |
+| Jehan Tohdeng | 6810545514 |
+| Thanakorn Innok | 6810545620 |
+| Thunyasorn Chaliasomboon | 6810545689 |
+| Theewasu Aekthong | 6810545701 |
+| Piyatida Muanjaingam | 6810545760 |
+| Inthat Niramarn | 6810545999 |
 
 ## Final Project Presentation & Live Demo
 
