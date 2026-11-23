@@ -10,6 +10,7 @@ This is a development and demonstration project. Checkout does not charge money,
 
 ## Contents
 
+- [Final Project Presentation & Live Demo](#final-project-presentation--live-demo)
 - [Features](#features)
 - [Technology stack](#technology-stack)
 - [Architecture](#architecture)
@@ -25,6 +26,14 @@ This is a development and demonstration project. Checkout does not charge money,
 - [Troubleshooting](#troubleshooting)
 - [Known limitations](#known-limitations)
 - [Supporting documentation](#supporting-documentation)
+
+## Final Project Presentation & Live Demo
+
+This video includes our final project presentation and a live demonstration of the NEXSTAGE Event Booking System.
+
+The demonstration covers event browsing, ticket booking, Admin CRUD operations, SQL transaction rollback, and MongoDB activity logs.
+
+[Watch the Presentation & Demo](https://youtu.be/71bqBvReIEI)
 
 ## Features
 
